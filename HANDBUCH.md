@@ -455,4 +455,4 @@ Läuft die Zeit ab, hat die Föderation verloren.
 
 ---
 
-*Basiert auf dem BASIC-Original von Mike Mayfield (1974). Python-Port 2026.*
+*Basiert auf dem BASIC-Original von Mike Mayfield (1978). Python-Port 2026 bzw. dem LUA Port von Emanuele Bolognesi, 2020.
