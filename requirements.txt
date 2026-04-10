@@ -1,0 +1,6 @@
+# Install with:  pip install rich
+rich
+
+# Future extension ideas:
+# textual       -- full TUI with widgets
+# pygame        -- 2D graphical version
