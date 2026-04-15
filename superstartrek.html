@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Star Trek</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #000;
+  color: #00dd00;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 8px;
+  gap: 0;
+}
+
+#bridge {
+  flex-shrink: 0;
+  white-space: pre;
+  line-height: 1.4;
+  padding: 0 2px 4px;
+  border-bottom: 1px solid #003300;
+  overflow-x: auto;
+}
+
+#bridge::-webkit-scrollbar { height: 4px; }
+#bridge::-webkit-scrollbar-track { background: #0a0a0a; }
+#bridge::-webkit-scrollbar-thumb { background: #004400; border-radius: 2px; }
+
+#terminal {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  line-height: 1.45;
+  padding: 4px 2px 2px;
+}
+
+#terminal::-webkit-scrollbar          { width: 6px; height: 6px; }
+#terminal::-webkit-scrollbar-track    { background: #0a0a0a; }
+#terminal::-webkit-scrollbar-thumb    { background: #006600; border-radius: 3px; }
+
+.line {
+  white-space: pre;
+  min-height: 1.45em;
+  display: block;
+}
+
+#input-row {
+  display: none;
+  align-items: center;
+  border-top: 1px solid #004400;
+  padding-top: 4px;
+}
+
+#prompt-text { white-space: pre; }
+
+#cmd {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #00ff55;
+  font-family: inherit;
+  font-size: inherit;
+  caret-color: #00ff55;
+  white-space: pre;
+}
+
+/* Sector tokens */
+.k  { color: #ff4040; font-weight: bold; }
+.sb { color: #44ff44; font-weight: bold; }
+.e  { color: #40ddff; font-weight: bold; }
+.r  { color: #ff66ff; font-weight: bold; }
+.st { color: #ffcc00; }
+
+/* Condition */
+.c-red { color: #ff2020; font-weight: bold; }
+.c-grn { color: #44ff44; font-weight: bold; }
+.c-yel { color: #ffcc00; font-weight: bold; }
+.c-dok { color: #44ddff; font-weight: bold; }
+
+/* Messages */
+.m-kill { color: #ffff22; font-weight: bold; }
+.m-warn { color: #ff7700; font-weight: bold; }
+.m-die  { color: #ff2020; font-weight: bold; }
+.m-win  { color: #44ff44; font-weight: bold; }
+.m-atk  { color: #ff5050; }
+.m-rom  { color: #ff66ff; }
+
+.restart-btn {
+  display: inline-block;
+  margin-top: 12px;
+  background: #002200;
+  color: #00dd00;
+  border: 1px solid #00dd00;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 5px 18px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.restart-btn:hover { background: #005500; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="bridge"></div>
+  <div id="terminal" aria-live="polite" aria-label="Spielausgabe"></div>
+  <div id="input-row">
+    <span id="prompt-text"></span><input id="cmd" type="text" autocomplete="off" spellcheck="false" aria-label="Befehl">
+  </div>
+</div>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TERMINAL ENGINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const $bridge = document.getElementById('bridge');
+const $term   = document.getElementById('terminal');
+const $irow   = document.getElementById('input-row');
+const $cmd    = document.getElementById('cmd');
+const $prompt = document.getElementById('prompt-text');
+
+let _resolveInput = null;
+let _audioCtx     = null;
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+/**
+ * Converts a raw game string to safe innerHTML:
+ * 1. Game tokens → private-use-area placeholders
+ * 2. Remaining text → HTML-escaped
+ * 3. Placeholders → colored <span> elements
+ */
+function safeHtml(text) {
+  const TOK = [
+    ['+K+', '\uE001'],
+    ['>!<', '\uE002'],
+    ['<*>', '\uE003'],
+    ['{R}', '\uE004'],
+    [' * ', '\uE005'],
+  ];
+  for (const [t, p] of TOK) text = text.split(t).join(p);
+
+  // HTML-escape remaining
+  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // Restore placeholders as colored spans
+  const SPN = [
+    ['\uE001', '<span class="k">+K+</span>'],
+    ['\uE002', '<span class="sb">&gt;!&lt;</span>'],
+    ['\uE003', '<span class="e">&lt;*&gt;</span>'],
+    ['\uE004', '<span class="r">{R}</span>'],
+    ['\uE005', '<span class="st"> * </span>'],
+  ];
+  for (const [p, s] of SPN) text = text.split(p).join(s);
+  return text;
+}
+
+/** Apply message-level highlights (runs on already-escaped HTML). */
+function colorMsg(html) {
+  const rules = [
+    ['*** KLINGONE VERNICHTET ***',                'm-kill'],
+    ['*** ROMULANER VERNICHTET ***',               'm-kill'],
+    ['*** STERNENFLOTTENBASIS VERNICHTET ***',     'm-warn'],
+    ['DIE ENTERPRISE WURDE VERNICHTET',            'm-die'],
+    ['GLÜCKWUNSCH, CAPTAIN',                       'm-win'],
+    ['ZU SPÄT, CAPTAIN',                           'm-die'],
+    ['KLINGONENSCHIFFE GREIFEN DIE ENTERPRISE AN', 'm-atk'],
+    ['ROMULANISCHER WARBIRD ENTTARNT SICH',        'm-rom'],
+    ['ROMULANISCHE WARBIRDS GREIFEN AN',           'm-atk'],
+    ['TORPEDO VERFEHLT!',                          'm-kill'],
+    ['** SCHWERER FEHLER **',                      'm-warn'],
+    // Schiffszustand aus SRS-Statuszeile
+    ['ROTER ALARM', 'c-red'],
+    ['KAMPFBEREITSCHAFT ROT', 'c-red'],
+    ['** ROTER ALARM **', 'c-red'],
+    ['ANGEDOCKT',  'c-dok'],
+    ['GRÜN',       'c-grn'],
+    ['GELB',       'c-yel'],
+  ];
+  for (const [msg, cls] of rules) {
+    if (html.includes(msg))
+      html = html.split(msg).join(`<span class="${cls}">${msg}</span>`);
+  }
+  return html;
+}
+
+async function telePrint(text = '', delayMs = 60) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  let html = safeHtml(String(text));
+  html = colorMsg(html);
+  div.innerHTML = html || '&nbsp;';
+  $term.appendChild(div);
+  $term.scrollTop = $term.scrollHeight;
+  if (delayMs > 0) await sleep(delayMs);
+}
+
+async function ask(promptText = '') {
+  $prompt.textContent = promptText;
+  $irow.style.display = 'flex';
+  $cmd.value = '';
+  await sleep(10);
+  $cmd.focus();
+  return new Promise(resolve => { _resolveInput = resolve; });
+}
+
+$cmd.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !_resolveInput) return;
+  const val    = $cmd.value.trim();
+  const echoed = document.createElement('div');
+  echoed.className  = 'line';
+  echoed.textContent = $prompt.textContent + val;
+  $term.appendChild(echoed);
+  $term.scrollTop = $term.scrollHeight;
+  $irow.style.display = 'none';
+  const fn = _resolveInput;
+  _resolveInput = null;
+  fn(val);
+});
+
+function clearScreen() {
+  $term.innerHTML = ''; // Log leeren — #bridge HUD bleibt persistent erhalten
+}
+
+function beep(freq = 440, ms = 200) {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx  = _audioCtx;
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.07, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + ms / 1000);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + ms / 1000 + 0.05);
+  } catch (_) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GAME CLASS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class Game {
+  constructor() {
+    this.gameOver = false;
+    this._srsShown = false;
+
+    // Ship resources
+    this.maxEnergyLevel    = 3000;
+    this.maxTorpedoes      = 10;
+    this.klingonBaseEnergy = 200;
+    this.romulanBaseEnergy = 150;
+
+    this.energyLevel     = this.maxEnergyLevel;
+    this.photonTorpedoes = this.maxTorpedoes;
+    this.shieldLevel     = 0;
+    this.shipDocked      = false;
+    this.shipCondition   = '';
+
+    // Time
+    this.stardate     = 2000 + Math.floor(Math.random() * 1900);
+    this.t0           = this.stardate;
+    this.maxNumOfDays = 25 + Math.floor(Math.random() * 10);
+
+    // Galaxy arrays (1-based; index 0 unused)
+    // galaxy[i][j] = klingons*1000 + romulans*100 + starbases*10 + stars
+    this.galaxy        = Array.from({length: 9}, () => new Array(9).fill(0));
+    this.exploredSpace = Array.from({length: 9}, () => new Array(9).fill(0));
+
+    // Klingons in quadrant: k[1..3] = [row, col, energy]
+    this.k = [null, [0,0,0], [0,0,0], [0,0,0]];
+
+    // Romulans in quadrant: r[1..2] = [row, col, energy, cloaked]
+    this.r = [null, [0,0,0,false], [0,0,0,false]];
+    this.rJustDecloaked = [false, false, false]; // index 1..2
+
+    // Damage levels (index 1..8, >=0 = ok, <0 = damaged)
+    this.damageLevel = new Array(9).fill(0.0);
+
+    // Quadrant counters
+    this.k3 = 0; this.r3 = 0; this.b3 = 0; this.s3 = 0;
+    this.b4 = 1; this.b5 = 1; // starbase row/col in quadrant
+
+    // Enterprise position (1-based)
+    this.q1 = this._fnr(); this.q2 = this._fnr(); // quadrant
+    this.s1 = this._fnr(); this.s2 = this._fnr(); // sector
+
+    // Previous quadrant (for cross-quadrant detection)
+    this.q4 = 0; this.q5 = 0;
+
+    // Movement state (set during courseControl)
+    this.noOfSteps = 0; this.stepX1 = 0.0; this.stepX2 = 0.0; this.warpFactor = 0.0;
+
+    // Fleet totals
+    this.totalStarbases    = 0;
+    this.totalKlingonShips = 0; this.initialKlingonShips = 0;
+    this.totalRomulanShips = 0; this.initialRomulanShips = 0;
+
+    // Special event quadrants ([row, col]; [0,0] = consumed/not-set)
+    this.harryMuddQuadrant  = [0, 0];
+    this.vulcanShipQuadrant = [0, 0];
+    this.traderQuadrant     = [0, 0];
+    this.tribblesInfested   = false;
+
+    // Quadrant display string: 8×8 cells × 3 chars = 192 chars
+    this.quadString = ' '.repeat(192);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KONSTANTEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static get DEVICE_NAMES() {
+    return [
+      null,                   // 0 unused
+      'WARPANTRIEB',
+      'KURZSTRECKENSENSOREN',
+      'LANGSTRECKENSENSOREN',
+      'PHASER-STEUERUNG',
+      'PHOTONENRÖHREN',
+      'SCHADENSKONTROLLE',
+      'SCHILDSTEUERUNG',
+      'BIBLIOTHEKSCOMPUTER',
+    ];
+  }
+
+  // Kursdeltas (1-basiert; Index 9 == Index 1)
+  static get COURSE_DELTA() {
+    return [
+      null,
+      [0,  1], [-1,  1], [-1, 0], [-1, -1],
+      [0, -1], [ 1, -1], [ 1, 0], [ 1,  1],
+      [0,  1],
+    ];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UTILITIES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _fnr() { return Math.floor(Math.random() * 8) + 1; }
+
+  _roundTo(val, precision) {
+    const f = Math.pow(10, precision);
+    return Math.floor(val * f) / f;
+  }
+
+  _formatWithSpaces(s, maxlength, centered = false) {
+    s = String(s);
+    if (centered) {
+      const pad   = maxlength - s.length;
+      const left  = Math.floor(pad / 2);
+      const right = pad - left;
+      return ' '.repeat(left) + s + ' '.repeat(right);
+    }
+    return s + ' '.repeat(Math.max(0, maxlength - s.length));
+  }
+
+  _randomUniqueQuadrant(taken) {
+    let q;
+    do { q = [this._fnr(), this._fnr()]; }
+    while (taken.some(t => t[0] === q[0] && t[1] === q[1]));
+    return q;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUADRANT-NAMEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _getQuadrantName(z4, z5, regionNameOnly = false) {
+    const names1 = ['ANTARES','RIGEL','PROCYON','VEGA','CANOPUS','ALTAIR','SAGITTARIUS','POLLUX'];
+    const names2 = ['SIRIUS','DENEB','CAPELLA','BETELGEUSE','ALDEBARAN','REGULUS','ARCTURUS','SPICA'];
+    const starnames = z5 <= 4 ? names1 : names2;
+    let name = starnames[z4 - 1];
+    if (!regionNameOnly) {
+      const suffix = {1:' I',2:' II',3:' III',4:' IV',5:' I',6:' II',7:' III',8:' IV'};
+      name += suffix[z5] || '';
+    }
+    return name;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUADRANT-STRING-HELFER
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _addElementInQuadrantString(elem, y, x) {
+    y = Math.floor(y - 0.5);
+    x = Math.floor(x - 0.5);
+    const pos = x * 3 + y * 24;
+    this.quadString = this.quadString.slice(0, pos) + elem + this.quadString.slice(pos + 3);
+    return pos;
+  }
+
+  _searchStringInQuadrant(elem, y, x) {
+    y = Math.floor(y - 0.5);
+    x = Math.floor(x - 0.5);
+    const pos = x * 3 + y * 24;
+    return this.quadString.slice(pos, pos + 3) === elem;
+  }
+
+  _findEmptyPlaceInQuadrant() {
+    let y, x;
+    do { y = this._fnr(); x = this._fnr(); }
+    while (!this._searchStringInQuadrant('   ', y, x));
+    return [y, x];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHIFFSSTATUS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _checkShipStatus() {
+    if (this.shipDocked) return 'ANGEDOCKT';
+    const visRomulans = Array.from({length: this.r3}, (_,i)=>i+1)
+      .filter(i => this.r[i][2] > 0 && !this.r[i][3]).length;
+    if (this.k3 > 0 || visRomulans > 0) return 'ROTER ALARM';
+    if (this.energyLevel < this.maxEnergyLevel / 10) return 'GELB';
+    return 'GRÜN';
+  }
+
+  async _checkIfDocked() {
+    this.shipDocked = false;
+    for (let i = Math.floor(this.s1) - 1; i <= Math.floor(this.s1) + 1; i++) {
+      for (let j = Math.floor(this.s2) - 1; j <= Math.floor(this.s2) + 1; j++) {
+        if (i >= 1 && i <= 8 && j >= 1 && j <= 8) {
+          if (this._searchStringInQuadrant('>!<', i, j)) {
+            this.shipDocked = true;
+            this.shipCondition = 'ANGEDOCKT';
+            this.energyLevel      = this.maxEnergyLevel;
+            this.photonTorpedoes  = this.maxTorpedoes;
+            beep(880, 100); beep(1100, 150);
+            await telePrint('SCHILDE DEAKTIVIERT FÜR ANLEGEMANÖVER.');
+            this.shieldLevel = 0;
+          }
+        }
+      }
+    }
+    this.shipCondition = this._checkShipStatus();
+    return this.shipDocked;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MATHEMATISCHE HILFSMETHODEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _calcDistance(x1, y1, x2, y2) {
+    return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
+  }
+
+  async _calcAndPrintDirection(m, n, startCourse) {
+    let dir;
+    if (Math.abs(m) > Math.abs(n)) {
+      dir = startCourse + Math.abs(n) / Math.abs(m);
+    } else {
+      dir = startCourse + (Math.abs(n) - Math.abs(m) + Math.abs(n)) / Math.abs(n);
+    }
+    await telePrint(` RICHTUNG = ${this._roundTo(dir, 2)}`);
+    return dir;
+  }
+
+  async _printDistanceAndDirection(x1, y1, x2, y2) {
+    const hd = y1 - y2;
+    const vd = x2 - x1;
+    if (hd < 0) {
+      if (vd > 0)      await this._calcAndPrintDirection(vd, hd, 3);
+      else if (hd !== 0) await this._calcAndPrintDirection(hd, vd, 5);
+    } else {
+      if (vd < 0)       await this._calcAndPrintDirection(vd, hd, 7);
+      else if (hd > 0)  await this._calcAndPrintDirection(hd, vd, 1);
+      else if (vd === 0) await this._calcAndPrintDirection(hd, vd, 5);
+      else              await this._calcAndPrintDirection(hd, vd, 1);
+    }
+    const dist = this._calcDistance(x1, y1, x2, y2);
+    await telePrint(` ENTFERNUNG = ${this._roundTo(dist, 2)}`);
+    return dist;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GALAXY-INITIALISIERUNG
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _initGalaxy() {
+    for (let i = 1; i <= 8; i++) {
+      for (let j = 1; j <= 8; j++) {
+        let k3 = 0, r3loc = 0;
+        this.exploredSpace[i][j] = 0;
+
+        const r1 = Math.random();
+        if      (r1 > 0.98) { k3 = 3; this.totalKlingonShips += 3; }
+        else if (r1 > 0.95) { k3 = 2; this.totalKlingonShips += 2; }
+        else if (r1 > 0.83) { k3 = 1; this.totalKlingonShips += 1; }
+
+        const r2 = Math.random();
+        if      (r2 > 0.97) { r3loc = 2; this.totalRomulanShips += 2; }
+        else if (r2 > 0.85) { r3loc = 1; this.totalRomulanShips += 1; }
+
+        let b3 = 0;
+        if (Math.random() > 0.96) { b3 = 1; this.totalStarbases++; }
+
+        this.galaxy[i][j] = k3 * 1000 + r3loc * 100 + b3 * 10 + this._fnr();
+      }
+    }
+
+    if (this.totalKlingonShips > this.maxNumOfDays) this.maxNumOfDays = this.totalKlingonShips + 1;
+
+    if (this.totalStarbases === 0) {
+      this.totalStarbases = 1;
+      this.galaxy[this.q1][this.q2] += 10;
+      this.q1 = this._fnr(); this.q2 = this._fnr();
+    }
+
+    this.initialKlingonShips = this.totalKlingonShips;
+    this.initialRomulanShips = this.totalRomulanShips;
+
+    // Sonderereignis-Quadranten (müssen sich vom Enterprise-Start und voneinander unterscheiden)
+    const taken = [[this.q1, this.q2]];
+    const hmQ = this._randomUniqueQuadrant(taken);
+    this.harryMuddQuadrant = hmQ; taken.push(hmQ);
+    const vsQ = this._randomUniqueQuadrant(taken);
+    this.vulcanShipQuadrant = vsQ; taken.push(vsQ);
+    this.traderQuadrant = this._randomUniqueQuadrant(taken);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ANZEIGE – Kompassrose
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _showDirections() {
+    await telePrint('');
+    await telePrint('      4  3  2   ');
+    await telePrint('       \\ | /    ');
+    await telePrint('        \\|/     ');
+    await telePrint('    5 ---*--- 1 ');
+    await telePrint('        /|\\     ');
+    await telePrint('       / | \\    ');
+    await telePrint('      6  7  8   ');
+    await telePrint('');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KURZSTRECKENSCAN (SRS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async shortRangeSensorScan() {
+    this._srsShown = true;  // signal to main loop that SRS was handled
+    if (this.damageLevel[2] < 0) {
+      await telePrint('*** KURZSTRECKENSENSOREN AUSGEFALLEN ***');
+      $bridge.innerHTML = '';
+      return false;
+    }
+
+    // 8 Zeilen × 8 Zellen × (3 Zeichen + 1 Leerzeichen) = 32 Zeichen
+    const grid = [];
+    for (let i = 0; i < 8; i++) {
+      const b = i * 24;
+      let row = '';
+      for (let j = 0; j < 8; j++) row += this.quadString.slice(b + j*3, b + j*3 + 3) + ' ';
+      grid.push(row); // 32 Zeichen
+    }
+
+    const cond  = this.shipCondition;
+    const VS_W  = 33;   // Viewscreen-Innenbreite
+    const ST_W  = 23;   // Statusspaltenbreite (mind. 23 für "ROTER ALARM")
+    const PAD_R = 70 - 2 - VS_W - 1 - 2 - ST_W; // = 9
+
+    const st = [
+      `STERNDATUM  ${this._roundTo(this.stardate, 1)}`,
+      `ZUSTAND     ${cond}`,
+      `QUADRANT    ${this.q1} , ${this.q2}`,
+      `SEKTOR      ${Math.floor(this.s1)} , ${Math.floor(this.s2)}`,
+      `TORPEDOS    ${Math.floor(this.photonTorpedoes)}`,
+      `ENERGIE     ${Math.floor(this.energyLevel)}`,
+      `SCHILDE     ${Math.floor(this.shieldLevel)}`,
+      `KLINGONEN   ${Math.floor(this.totalKlingonShips)}`,
+    ];
+
+    const H = '\u2550', V = '\u2551',
+          TL = '\u2554', TR = '\u2557', BL = '\u255a', BR = '\u255d';
+
+    const outerTop  = TL + H.repeat(70) + TR;
+    const outerBot  = BL + H.repeat(70) + BR;
+    const vsTop     = ' ' + TL + H.repeat(VS_W) + TR + ' '.repeat(70 - VS_W - 3);
+    const vsBot     = ' ' + BL + H.repeat(VS_W) + BR + ' '.repeat(70 - VS_W - 3);
+    const bridgeCrew = [
+      ' '.repeat(70),
+      '   \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557'.padEnd(70),
+      '   \u2551CHK\u2551    \u2551SLU\u2551    \u2551   KIRK   \u2551    \u2551UHR\u2551    \u2551SPK\u2551'.padEnd(70),
+      ' \u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550'.padEnd(70),
+    ];
+
+    const rawLines = [outerTop, V + vsTop + V];
+    for (let i = 0; i < 8; i++) {
+      const vsContent = ' ' + grid[i];
+      const stPadded  = this._formatWithSpaces(st[i], ST_W);
+      const content   = ' ' + V + vsContent + V + '  ' + stPadded + ' '.repeat(PAD_R);
+      rawLines.push(V + content + V);
+    }
+    rawLines.push(V + vsBot + V);
+    for (const bl of bridgeCrew) rawLines.push(V + bl + V);
+    rawLines.push(outerBot);
+
+    // Render in-place into the fixed bridge HUD
+    $bridge.innerHTML = rawLines.map(line => colorMsg(safeHtml(line))).join('\n');
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LANGSTRECKENSCAN (LRS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async longRangeSensorScan() {
+    if (this.damageLevel[3] < 0) {
+      await telePrint('\n*** LANGSTRECKENSENSOREN NICHT BETRIEBSBEREIT ***\n');
+      return false;
+    }
+    if (await this._cloakedRomulansIntercept()) return false;
+
+    await telePrint(`LANGSTRECKENSCAN FÜR QUADRANT ${this.q1},${this.q2}`);
+    const sep = '-----------------------';
+    await telePrint(sep);
+
+    for (let i = this.q1 - 1; i <= this.q1 + 1; i++) {
+      const n = [-1, -2, -3];
+      for (let j = this.q2 - 1; j <= this.q2 + 1; j++) {
+        const idx = j - (this.q2 - 1);
+        if (i >= 1 && i <= 8 && j >= 1 && j <= 8) {
+          n[idx] = this.galaxy[i][j];
+          this.exploredSpace[i][j] = this.galaxy[i][j];
+        }
+      }
+      let rowStr = '';
+      for (const val of n) {
+        rowStr += ': ';
+        if (val < 0) {
+          rowStr += '**** ';
+        } else {
+          const rCount = Math.floor(val / 100) % 10;
+          let dv = val;
+          if (rCount > 0) dv = Math.max(0, val + Math.floor(Math.random() * 3) - 1);
+          rowStr += String(dv + 10000).slice(1, 5) + ' ';
+        }
+      }
+      await telePrint(rowStr + ':');
+      await telePrint(sep);
+    }
+    return true;
+  }
+
+  // ── Stub – wird in Phase 6a durch echte Logik ersetzt ────────────────────
+  async _cloakedRomulansIntercept() { return false; }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHILDSTEUERUNG (SHE)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async shieldControl() {
+    if (this.damageLevel[7] < 0) { await telePrint('SCHILDSTEUERUNG NICHT BETRIEBSBEREIT'); return false; }
+    await telePrint(`VERFÜGBARE ENERGIE = ${Math.floor(this.energyLevel + this.shieldLevel)}  (SCHIFFE: ${Math.floor(this.energyLevel)}, SCHILDE: ${Math.floor(this.shieldLevel)})`);
+    const raw = await ask('ANZAHL DER EINHEITEN FÜR SCHILDE? ');
+    const units = parseFloat(raw);
+    if (isNaN(units)) {
+      await telePrint('FALSCHER WERT');
+    } else if (units < 0 || this.shieldLevel === units) {
+      await telePrint('<SCHILDE UNVERÄNDERT>');
+    } else if (units > this.energyLevel + this.shieldLevel) {
+      await telePrint('SCHILDKONTROLLE MELDET: \'DAS IST NICHT DIE FÖRDERATION\'S SCHATZKAMMER.\'');
+      await telePrint('<SCHILDE UNVERÄNDERT>');
+    } else {
+      this.energyLevel = this.energyLevel + this.shieldLevel - units;
+      this.shieldLevel = units;
+      await telePrint('BERICHT DER DEFLEKTOR-SCHALTSTELLE:');
+      await telePrint(`  'SCHILDE JETZT BEI ${this.shieldLevel} EINHEITEN GEMÄSS IHREM BEFEHL.'`);
+    }
+    return this.shieldLevel;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHADENSKONTROLLE (DAM)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async damageControl() {
+    if (this.damageLevel[6] >= 0) {
+      await telePrint('\nGERÄT                   REPARATURZUSTAND');
+      for (let idx = 1; idx <= 8; idx++) {
+        await telePrint(
+          this._formatWithSpaces(Game.DEVICE_NAMES[idx], 27) +
+          this._roundTo(this.damageLevel[idx], 2)
+        );
+      }
+    } else {
+      await telePrint('SCHADENSBERICHT NICHT VERFÜGBAR');
+    }
+    await telePrint('');
+
+    if (this.shipDocked) {
+      let timeToRepair = 0.0;
+      for (let i = 1; i <= 8; i++) if (this.damageLevel[i] < 0) timeToRepair += 0.1;
+      if (timeToRepair === 0.0) return 0;
+
+      await telePrint('');
+      timeToRepair = this._roundTo(timeToRepair + Math.random() * 0.5, 2);
+      if (timeToRepair > 0.9) timeToRepair = 0.9;
+      await telePrint('TECHNIKER BEREIT FÜR REPARATURARBEITEN AN IHREM SCHIFF;');
+      await telePrint(`GESCHÄTZTE REPARATURZEIT: ${timeToRepair} STERNDATEN`);
+      const ans = await ask('GENEHMIGEN SIE DEN REPARATURAUFTRAG (J/N)? ');
+      if (ans.toUpperCase() === 'J') {
+        for (let i = 1; i <= 8; i++) if (this.damageLevel[i] < 0) this.damageLevel[i] = 0;
+        this.stardate += timeToRepair + 0.1;
+        await telePrint('REPARATUR ABGESCHLOSSEN.');
+      }
+    }
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BORDCOMPUTER (COM) + Untermenüs
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _printComputerRecord(galaxyMapOn) {
+    await telePrint('       1     2     3     4     5     6     7     8');
+    await telePrint('     ----- ----- ----- ----- ----- ----- ----- -----');
+    for (let i = 1; i <= 8; i++) {
+      let row = `${i}  `;
+      if (galaxyMapOn) {
+        const n1 = this._getQuadrantName(i, 1, true);
+        const n2 = this._getQuadrantName(i, 5, true);
+        row += '  ' + this._formatWithSpaces(n1, 23, true) + ' ' + this._formatWithSpaces(n2, 23, true);
+      } else {
+        for (let j = 1; j <= 8; j++) {
+          row += '   ';
+          if (this.exploredSpace[i][j] === 0) { row += '****'; }
+          else { row += String(this.exploredSpace[i][j] + 10000).slice(1, 5); }
+        }
+      }
+      await telePrint(row);
+      await telePrint('     ----- ----- ----- ----- ----- ----- ----- -----');
+    }
+    await telePrint('');
+  }
+
+  async galaxyMap() {
+    await telePrint('                        DIE GALAXIS');
+    await this._printComputerRecord(true);
+    return true;
+  }
+
+  async cumulativeGalacticRecord() {
+    await telePrint(`       COMPUTERAUFZEICHNUNG DER GALAXIS FÜR QUADRANT ${this.q1},${this.q2}\n`);
+    await this._printComputerRecord(false);
+    return true;
+  }
+
+  async statusReport() {
+    await telePrint('   STATUSBERICHT:');
+    const ks = this.totalKlingonShips === 1 ? '' : 'E';
+    await telePrint(`KLINGON${ks} VERBLIEBEN: ${this.totalKlingonShips}`);
+    const rs = this.totalRomulanShips === 1 ? '' : 'E';
+    await telePrint(`ROMULANER${rs} VERBLIEBEN: ${this.totalRomulanShips}`);
+    await telePrint(`MISSION MUSS ABGESCHLOSSEN WERDEN IN ${this._roundTo(this.t0 + this.maxNumOfDays - this.stardate, 1)} STERNDATEN`);
+    if (this.totalStarbases < 1) {
+      await telePrint('IHRE DUMMHEIT HAT SIE ALLEIN IN DER GALAXIS GELASSEN');
+      await telePrint('  -- SIE HABEN KEINE STERNENBASIS MEHR!');
+    } else {
+      const bs = this.totalStarbases > 1 ? 'STERNENBASEN' : 'STERNENBASIS';
+      await telePrint(`DIE FEDERATION UNTERHÄLT ${this.totalStarbases} ${bs} IN DER GALAXIS`);
+    }
+    await this.damageControl();
+    return true;
+  }
+
+  async photonTorpedoData() {
+    if (this.k3 <= 0 && this.r3 <= 0) {
+      await telePrint('WISSENSCHAFTSOFFIZIER SPOCK MELDET \'SENSOREN ZEIGEN KEINE FEINDSCHIFFE');
+      await telePrint('                                IN DIESEM QUADRANTEN\'');
+      return true;
+    }
+    if (this.k3 > 0) {
+      const ks = this.k3 > 1 ? 'E' : '';
+      await telePrint(`VON ENTERPRISE ZU KLINGON-KAMPFKREUZER${ks}:`);
+      for (let i = 1; i <= 3; i++)
+        if (this.k[i][2] > 0) await this._printDistanceAndDirection(this.k[i][0], this.k[i][1], this.s1, this.s2);
+    }
+    if (this.r3 > 0) {
+      const visible = [1,2].filter(i => this.r[i] && this.r[i][2] > 0 && !this.r[i][3]);
+      const cloaked = [1,2].filter(i => this.r[i] && this.r[i][2] > 0 && this.r[i][3]).length;
+      if (visible.length > 0) {
+        const rs = visible.length > 1 ? 'S' : '';
+        await telePrint(`VON ENTERPRISE ZU ROMULANISCHEM WARBIRD${rs}:`);
+        for (const i of visible) await this._printDistanceAndDirection(this.r[i][0], this.r[i][1], this.s1, this.s2);
+      }
+      if (cloaked > 0) await telePrint(`SENSOREN ENTDECKEN ${cloaked} GETARNTE ROMULANISCHE SIGNALE -- POSITION UNBEKANNT`);
+    }
+    return true;
+  }
+
+  async distanceCalculator() {
+    await telePrint('KURS-/ENTFERNUNGSRECHNER:');
+    await telePrint(`SIE SIND BEI QUADRANT ${this.q1},${this.q2} SEKTOR ${this.s1},${this.s2}`);
+    const c1 = await ask('BITTE STARTKOORDINATEN EINGEBEN (Zeile,Spalte): ');
+    const m1 = c1.match(/(\d+)\s*,\s*(\d+)/);
+    if (!m1) { await telePrint('FALSCHE KOORDINATEN'); return false; }
+    const [y1, x1] = [parseInt(m1[1]), parseInt(m1[2])];
+    const c2 = await ask('  ZIELKOORDINATEN (Zeile,Spalte): ');
+    const m2 = c2.match(/(\d+)\s*,\s*(\d+)/);
+    if (!m2) { await telePrint('FALSCHE KOORDINATEN'); return false; }
+    const [y2, x2] = [parseInt(m2[1]), parseInt(m2[2])];
+    await this._printDistanceAndDirection(y2, x2, y1, x1);
+    return true;
+  }
+
+  async starbaseNavData() {
+    if (this.b3 > 0) {
+      await telePrint('VON ENTERPRISE ZUR STERNENBASIS:');
+      await this._printDistanceAndDirection(this.b4, this.b5, this.s1, this.s2);
+    } else {
+      await telePrint('MR. SPOCK MELDET, \'SENSOREN ZEIGEN KEINE STERNENBASIS IN DIESEM');
+      await telePrint(' QUADRANTEN.\'');
+    }
+    return true;
+  }
+
+  async libraryComputer() {
+    if (this.damageLevel[8] < 0) { await telePrint('COMPUTER DEAKTIVIERT'); return false; }
+    let done = false;
+    while (!done) {
+      const raw = await ask('COMPUTER AKTIV UND WARTET AUF BEFEHL? ');
+      await telePrint('');
+      const cmd = parseInt(raw);
+      if      (cmd === 0) done = await this.cumulativeGalacticRecord();
+      else if (cmd === 1) done = await this.statusReport();
+      else if (cmd === 2) done = await this.photonTorpedoData();
+      else if (cmd === 3) done = await this.starbaseNavData();
+      else if (cmd === 4) done = await this.distanceCalculator();
+      else if (cmd === 5) done = await this.galaxyMap();
+      else {
+        await telePrint('FUNKTIONEN DES BIBLIOTHEKSCOMPUTERS:');
+        await telePrint('   0 = KUMULATIVE GALAKTISCHE AUFZEICHNUNG');
+        await telePrint('   1 = STATUSBERICHT');
+        await telePrint('   2 = PHOTONENTORPEDO-DATEN');
+        await telePrint('   3 = STERNENBASIS-NAVIGATIONSDATEN');
+        await telePrint('   4 = KURS-/ENTFERNUNGSRECHNER');
+        await telePrint('   5 = GALAKISCHE REGIONSKARTE\n');
+      }
+    }
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SPIELENDE-METHODEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _enterpriseDestroyed() {
+    beep(150, 200); beep(120, 200); beep(100, 800);
+    await telePrint('\nDIE ENTERPRISE WURDE VERNICHTET.  DIE FÖRDERATION WIRD EROBERT.');
+    await sleep(1500);
+  }
+
+  _checkAllEnemiesDefeated() {
+    if (this.totalKlingonShips <= 0 && this.totalRomulanShips <= 0) {
+      this.gameOver = true; // set synchronously so the main loop exits immediately
+      this._allEnemiesDefeatedAsync(); // fire-and-forget for victory messages
+      return true;
+    }
+    return false;
+  }
+
+  async _allEnemiesDefeatedAsync() {
+    beep(523,150); beep(659,150); beep(784,150); beep(1047,400);
+    await telePrint('\nGLÜCKWUNSCH, CAPTAIN! ALLE FEINDLICHEN KRÄFTE WURDEN ELIMINIERT.');
+    await telePrint(`DIE LETZTE BEDROHUNG DER FÖRDERATION WURDE AM STERNDATUM ${this._roundTo(this.stardate,1)} VERNICHTET`);
+    const total = this.initialKlingonShips + this.initialRomulanShips;
+    const elapsed = this.stardate - this.t0;
+    if (total > 0 && elapsed > 0)
+      await telePrint(`\nIHRE EFFIZIENZWERTUNG IST ${Math.floor(1000 * (total / elapsed) ** 2)}`);
+    this.gameOver = true;
+  }
+
+  async _timeExpired() {
+    await telePrint('\nZU SPÄT, CAPTAIN!  DIE FÖRDERATION WURDE EROBERT.');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ENERGIE VERBRAUCHEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _consumeEnergy() {
+    this.energyLevel -= this.noOfSteps + 10;
+    if (this.energyLevel >= 0) return this.energyLevel;
+    await telePrint('SCHILDSTEUERUNG LIEFERT ENERGIE ZUM ABSCHLUSS DES MANÖVERS.');
+    this.shieldLevel += this.energyLevel;
+    this.energyLevel = 0;
+    if (this.shieldLevel < 0) this.shieldLevel = 0;
+    return this.energyLevel;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NACH DER BEWEGUNG IM QUADRANT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _endOfMovementInQuadrant() {
+    this._addElementInQuadrantString('<*>', Math.floor(this.s1), Math.floor(this.s2));
+    await this._consumeEnergy();
+
+    if (this.tribblesInfested) {
+      const drain = 200;
+      this.energyLevel = Math.max(0, this.energyLevel - drain);
+      await telePrint(`TRIBBLES VERBRAUCHEN ${drain} ENERGIEEINHEITEN. ENERGIE JETZT BEI ${Math.floor(this.energyLevel)}.`);
+    }
+
+    let dayIncrement = 1;
+    if (this.warpFactor < 1) dayIncrement = this._roundTo(this.warpFactor, 1);
+    this.stardate += dayIncrement;
+
+    if (this.stardate > this.t0 + this.maxNumOfDays) {
+      await this._timeExpired();
+      this.gameOver = true;
+      return true;
+    }
+    await this._checkIfDocked();
+    await this.shortRangeSensorScan();
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUADRANTENGRENZEN ÜBERSCHREITEN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _exceededQuadrantLimits(x, y) {
+    const xNew = 8 * this.q1 + x + this.noOfSteps * this.stepX1;
+    const yNew = 8 * this.q2 + y + this.noOfSteps * this.stepX2;
+    this.q1 = Math.floor(xNew / 8);
+    this.q2 = Math.floor(yNew / 8);
+    this.s1 = Math.floor(xNew - this.q1 * 8);
+    this.s2 = Math.floor(yNew - this.q2 * 8);
+
+    if (this.s1 === 0) { this.q1--; this.s1 = 8; }
+    if (this.s2 === 0) { this.q2--; this.s2 = 8; }
+
+    let crossPerimeter = false;
+    if (this.q1 < 1) { crossPerimeter = true; this.q1 = 1; this.s1 = 1; }
+    if (this.q1 > 8) { crossPerimeter = true; this.q1 = 8; this.s1 = 8; }
+    if (this.q2 < 1) { crossPerimeter = true; this.q2 = 1; this.s2 = 1; }
+    if (this.q2 > 8) { crossPerimeter = true; this.q2 = 8; this.s2 = 8; }
+
+    if (crossPerimeter) {
+      await telePrint('LT. UHURA MELDET NACHRICHT VON DER STERNENFLOTTE:');
+      await telePrint('  \'GENEHMIGUNG ZUM VERSUCH DER ÜBERQUERUNG DES GALAKTISCHEN PERIMETERS');
+      await telePrint('  WIRD HIERMIT *VERWEIGERT*.  BITTE MOTOREN ABSTELLEN.\'');
+      await telePrint('CHEFINGENIEUR SCOTT MELDET \'WARPANTRIEBE ABGESTELLT');
+      await telePrint(`  BEI SEKTOR ${this.s1} , ${this.s2} VON QUADRANT ${this.q1} , ${this.q2}'`);
+    }
+
+    if (this.q1 * 8 + this.q2 === this.q4 * 8 + this.q5) return false; // Quadrant unverändert
+
+    this.stardate += 1;
+    if (this.stardate > this.t0 + this.maxNumOfDays) {
+      await this._timeExpired();
+      this.gameOver = true;
+      return true;
+    }
+    await this._consumeEnergy();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KURSSTEUERUNG (NAV)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async courseControl() {
+    await this._showDirections();
+
+    const courseStr = await ask('KURS (0-9): ');
+    const course = parseFloat(courseStr);
+    if (isNaN(course) || course < 1 || course > 9) {
+      await telePrint("   LT. SULU MELDET, 'FALSCHE KURSDATEN, SIR!'");
+      return false;
+    }
+
+    const maxWarp = this.damageLevel[1] < 0 ? '0.2' : '8';
+    let warpFactor = null;
+    while (warpFactor === null) {
+      const ws = await ask(`WARPFAKTOR (0-${maxWarp})? `);
+      const wf = parseFloat(ws);
+      if (isNaN(wf)) { await telePrint(`BITTE EINE ZAHL ZWISCHEN 0 UND ${maxWarp} EINGEBEN`); continue; }
+      if (wf === 0) return false;
+      if (this.damageLevel[1] < 0 && wf > 0.2) {
+        await telePrint('WARPANTRIEBE BESCHÄDIGT. HÖCHSTGESCHWINDIGKEIT = WARP 0.2');
+      } else if (wf < 0 || wf > 8) {
+        await telePrint(`   CHEFINGENIEUR SCOTT MELDET 'DIE TRIEBWERKE HALTEN WARP ${wf} NICHT AUS!'`);
+      } else {
+        warpFactor = wf;
+      }
+    }
+
+    this.warpFactor  = warpFactor;
+    this.noOfSteps   = Math.floor(warpFactor * 8 + 0.5);
+
+    if (this.energyLevel < this.noOfSteps) {
+      await telePrint('INGENIEURSWESEN MELDET \'NICHT GENÜGEND ENERGIE VERFÜGBAR');
+      await telePrint(`                       FÜR MANÖVER BEI WARP ${warpFactor}!\'`);
+      if (this.shieldLevel >= (this.noOfSteps - this.energyLevel) && this.damageLevel[7] >= 0) {
+        await telePrint('DEFLEKTORZENTRALE BESTÄTIGT SCHILDENERGIE');
+        await telePrint('                         DERZEIT FÜR SCHILDE EINGESETZT.');
+      }
+      return false;
+    }
+
+    if (await this._cloakedRomulansIntercept()) return false;
+
+    // Klingonen neu positionieren
+    for (let i = 1; i <= this.k3; i++) {
+      if (this.k[i][2] > 0) {
+        this._addElementInQuadrantString('   ', this.k[i][0], this.k[i][1]);
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        this.k[i][0] = r1; this.k[i][1] = r2;
+        this._addElementInQuadrantString('+K+', r1, r2);
+      }
+    }
+
+    await this._romulansReposition();
+    this._romulansClockCycle();
+    if (await this._klingonsAttack())  return false;
+    if (await this._romulansAttack())  return false;
+
+    // Reparatur
+    const repairFactor = warpFactor < 1 ? warpFactor : 1.0;
+    for (let i = 1; i <= 8; i++) {
+      if (this.damageLevel[i] < 0) {
+        this.damageLevel[i] += repairFactor;
+        if (this.damageLevel[i] > -0.1 && this.damageLevel[i] < 0) this.damageLevel[i] = -0.1;
+        else if (this.damageLevel[i] >= 0)
+          await telePrint(`SCHADENSBERICHT: '${Game.DEVICE_NAMES[i]} REPARATUR ABGESCHLOSSEN.'`);
+      }
+    }
+
+    // Zufälliges Schadens/Reparaturereignis
+    if (Math.random() <= 0.2) {
+      const dev = this._fnr();
+      if (Math.random() >= 0.6) {
+        this.damageLevel[dev] += Math.random() * 3 + 1;
+        await telePrint(`SCHADENSBERICHT: '${Game.DEVICE_NAMES[dev]} REPARATURZUSTAND VERBESSERT.'`);
+      } else {
+        this.damageLevel[dev] -= Math.random() * 5 + 1;
+        await telePrint(`SCHADENSBERICHT: '${Game.DEVICE_NAMES[dev]} BESCHÄDIGT.'`);
+      }
+    }
+
+    this._addElementInQuadrantString('   ', Math.floor(this.s1), Math.floor(this.s2));
+
+    const cIndex = Math.floor(course);
+    const cCurr  = Game.COURSE_DELTA[cIndex];
+    const cNext  = Game.COURSE_DELTA[cIndex + 1];
+    const frac   = course - cIndex;
+    this.stepX1  = cCurr[0] + (cNext[0] - cCurr[0]) * frac;
+    this.stepX2  = cCurr[1] + (cNext[1] - cCurr[1]) * frac;
+
+    let x = this.s1, y = this.s2;
+    this.q4 = this.q1; this.q5 = this.q2;
+
+    for (let step = 0; step < this.noOfSteps; step++) {
+      this.s1 += this.stepX1;
+      this.s2 += this.stepX2;
+
+      if (this.s1 < 1 || this.s1 > 8 || this.s2 < 1 || this.s2 > 8) {
+        if (await this._exceededQuadrantLimits(x, y)) return true;
+        else break;
+      }
+
+      if (this._searchStringInQuadrant('   ', this.s1, this.s2)) {
+        x = this.s1; y = this.s2;
+      } else {
+        this.s1 = Math.floor(this.s1 - this.stepX1);
+        this.s2 = Math.floor(this.s2 - this.stepX2);
+        await telePrint('WARPANTRIEBE ABGESTELLT BEI');
+        await telePrint(`SEKTOR ${Math.floor(this.s1)} , ${Math.floor(this.s2)} WEGEN SCHLECHTER NAVIGATION.`);
+        break;
+      }
+    }
+
+    this.s1 = Math.floor(this.s1);
+    this.s2 = Math.floor(this.s2);
+    await this._endOfMovementInQuadrant();
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KLINGONENANGRIFF
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _klingonsAttack() {
+    if (this.k3 <= 0) return false;
+    await telePrint('KLINGONENSCHIFFE GREIFEN DIE ENTERPRISE AN', 800);
+    if (this.shipDocked) { await telePrint('STERNENBASISSCHILDE SCHÜTZEN DIE ENTERPRISE.'); return false; }
+
+    for (let i = 1; i <= 3; i++) {
+      const ke = this.k[i][2];
+      if (ke <= 0) continue;
+      const dist = this._calcDistance(this.k[i][0], this.k[i][1], this.s1, this.s2);
+      const hits = Math.floor((ke / dist) * (2 + Math.random())) + 1;
+      this.shieldLevel -= hits;
+      this.k[i][2] = ke / (3 + Math.random());
+      beep(220, 150);
+      await telePrint(`${hits} EINHEITEN TREFFER AUF ENTERPRISE VON SEKTOR ${this.k[i][0]},${this.k[i][1]}`);
+      if (this.shieldLevel < 0) { await this._enterpriseDestroyed(); this.gameOver = true; return true; }
+      await telePrint(`      <SCHILDE AUF ${Math.floor(this.shieldLevel)} EINHEITEN>`, 800);
+      if (hits > 19 && (this.shieldLevel === 0 || (Math.random() < 0.6 && this.shieldLevel > 0 && (hits / this.shieldLevel) > 0.02))) {
+        const dev = this._fnr();
+        this.damageLevel[dev] -= (hits / Math.max(this.shieldLevel, 1)) + 0.5 * Math.random();
+        await telePrint(`SCHADENSKONTROLLE MELDET '${Game.DEVICE_NAMES[dev]} DURCH TREFFER BESCHÄDIGT'`);
+      }
+    }
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ROMULANISCHER TARNZYKLUS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  _romulansClockCycle() {
+    for (let i = 1; i <= this.r3; i++) {
+      if (this.r[i][2] <= 0) continue;
+      if (this.r[i][3]) {
+        this.r[i][2] -= 15;
+        if (this.r[i][2] <= 0) {
+          this.r[i][2] = 0; this.r3--;
+          this.totalRomulanShips--;
+          this.galaxy[this.q1][this.q2] -= 100;
+          this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+          // async output nicht möglich in sync-Methode – wird beim nächsten print sichtbar
+        } else if (Math.random() < 0.10) {
+          this.r[i][3] = false;
+          this.rJustDecloaked[i] = true;
+          this._addElementInQuadrantString('{R}', this.r[i][0], this.r[i][1]);
+        }
+      } else {
+        if (!this.rJustDecloaked[i] && Math.random() < 0.40) {
+          this.r[i][3] = true;
+          this._addElementInQuadrantString('   ', this.r[i][0], this.r[i][1]);
+        }
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ROMULANISCHE NEUPOSITIONIERUNG
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _romulansReposition() {
+    const shieldsLow = this.shieldLevel < 200;
+    for (let i = 1; i <= this.r3; i++) {
+      if (this.r[i][2] <= 0) continue;
+      const moveChance = shieldsLow ? 0.80 : 0.60;
+      if (Math.random() < moveChance) {
+        if (!this.r[i][3]) this._addElementInQuadrantString('   ', this.r[i][0], this.r[i][1]);
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        this.r[i][0] = r1; this.r[i][1] = r2;
+        if (!this.r[i][3]) this._addElementInQuadrantString('{R}', r1, r2);
+      }
+      if (this.r[i][2] < 30 && Math.random() < 0.25) {
+        if (!this.r[i][3]) this._addElementInQuadrantString('   ', this.r[i][0], this.r[i][1]);
+        this.r[i][2] = 0; this.r3--;
+        this.totalRomulanShips--;
+        this.galaxy[this.q1][this.q2] -= 100;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        await telePrint('EIN ROMULANISCHER WARBIRD BRICHT AB UND ZIEHT SICH IN EINEN ANDEREN QUADRANTEN ZURÜCK.');
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ROMULANERANGRIFF
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _romulansAttack() {
+    if (this.r3 <= 0) return false;
+    const anyVis = [1,2].some(i => this.r[i] && this.r[i][2] > 0 && !this.r[i][3]);
+    if (!anyVis) return false;
+
+    await telePrint('ROMULANISCHE WARBIRDS GREIFEN AN', 800);
+    if (this.shipDocked) { await telePrint('STERNENBASISSCHILDE SCHÜTZEN DIE ENTERPRISE.'); return false; }
+
+    for (let i = 1; i <= 2; i++) {
+      if (!this.r[i] || this.r[i][2] <= 0 || this.r[i][3]) continue;
+      const dist = this._calcDistance(this.r[i][0], this.r[i][1], this.s1, this.s2);
+      let hits = Math.floor((this.r[i][2] / dist) * (2 + Math.random())) + 1;
+      if (this.rJustDecloaked[i]) {
+        hits *= 2;
+        this.rJustDecloaked[i] = false;
+        await telePrint(`HINTERHALT! ROMULANISCHER WARBIRD BEI SEKTOR ${this.r[i][0]},${this.r[i][1]} FEUERT VOLLE KRAFT!`);
+      }
+      this.shieldLevel -= hits;
+      this.r[i][2] = this.r[i][2] / (3 + Math.random());
+      beep(180, 150);
+      await telePrint(`${hits} EINHEITEN TREFFER AUF ENTERPRISE VON SEKTOR ${this.r[i][0]},${this.r[i][1]}`);
+      if (this.shieldLevel < 0) { await this._enterpriseDestroyed(); this.gameOver = true; return true; }
+      await telePrint(`      <SCHILDE AUF ${Math.floor(this.shieldLevel)} EINHEITEN>`, 800);
+      if (hits > 19 && (this.shieldLevel === 0 || (Math.random() < 0.6 && (hits / this.shieldLevel) > 0.02))) {
+        const dev = this._fnr();
+        this.damageLevel[dev] -= (hits / Math.max(this.shieldLevel, 1)) + 0.5 * Math.random();
+        await telePrint(`SCHADENSKONTROLLE MELDET '${Game.DEVICE_NAMES[dev]} DURCH TREFFER BESCHÄDIGT'`);
+      }
+      if (Math.random() < 0.70) {
+        this.r[i][3] = true;
+        this._addElementInQuadrantString('   ', this.r[i][0], this.r[i][1]);
+      }
+    }
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GETARNTE ROMULANER ABFANGEN (echter Ersatz des Stubs aus Phase 3)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _cloakedRomulansIntercept() {
+    const cloaked = [1,2].filter(i => this.r[i] && this.r[i][2] > 0 && this.r[i][3]);
+    if (cloaked.length === 0) return false;
+
+    await telePrint("MR. SPOCK: 'CAPTAIN — ROMULANISCHE ENERGIESIGNATUREN REAGIEREN AUF UNSERE EMISSIONEN!'", 800);
+    beep(180, 150);
+
+    for (const i of cloaked) {
+      this.r[i][3] = false;
+      this.rJustDecloaked[i] = false;
+      this._addElementInQuadrantString('{R}', this.r[i][0], this.r[i][1]);
+      await telePrint(`ROMULANISCHER WARBIRD ENTTARNT SICH BEI SEKTOR ${this.r[i][0]},${this.r[i][1]}!`, 400);
+    }
+
+    this.shipCondition = this._checkShipStatus();
+    await telePrint('ROMULANISCHE WARBIRDS GREIFEN DIE ENTERPRISE AN', 800);
+    if (this.shipDocked) { await telePrint('STERNENBASISSCHILDE SCHÜTZEN DIE ENTERPRISE.'); return false; }
+
+    for (const i of cloaked) {
+      if (this.r[i][2] <= 0) continue;
+      const dist = this._calcDistance(this.r[i][0], this.r[i][1], this.s1, this.s2);
+      const hits = Math.floor((this.r[i][2] / dist) * (2 + Math.random()) * 0.50) + 1;
+      this.shieldLevel -= hits;
+      this.r[i][2] = this.r[i][2] / (3 + Math.random());
+      beep(180, 150);
+      await telePrint(`${hits} EINHEITEN TREFFER AUF ENTERPRISE VON SEKTOR ${this.r[i][0]},${this.r[i][1]}`);
+      if (this.shieldLevel < 0) { await this._enterpriseDestroyed(); this.gameOver = true; return true; }
+      await telePrint(`      <SCHILDE AUF ${Math.floor(this.shieldLevel)} EINHEITEN>`, 800);
+      if (hits > 19 && (this.shieldLevel === 0 || (Math.random() < 0.6 && (hits / this.shieldLevel) > 0.02))) {
+        const dev = this._fnr();
+        this.damageLevel[dev] -= (hits / Math.max(this.shieldLevel, 1)) + 0.5 * Math.random();
+        await telePrint(`SCHADENSKONTROLLE MELDET '${Game.DEVICE_NAMES[dev]} DURCH TREFFER BESCHÄDIGT'`);
+      }
+    }
+    await telePrint('AKTION UNTERBROCHEN — ROMULANER HABEN DIE ENTERPRISE ANGEGRIFFEN.', 800);
+    await this.shortRangeSensorScan();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASER (PHA)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async firePhasers() {
+    if (this.damageLevel[4] < 0) { await telePrint('PHASER NICHT BETRIEBSBEREIT'); return false; }
+    if (this.k3 < 1 && this.r3 < 1) {
+      await telePrint("WISSENSCHAFTSOFFIZIER SPOCK MELDET 'SENSOREN ZEIGEN KEINE FEINDSCHIFFE");
+      await telePrint("                                IN DIESEM QUADRANTEN'");
+      return false;
+    }
+    if (this.damageLevel[8] < 0) await telePrint('COMPUTERAUSFALL BEEINTRÄCHTIGT GENAUIGKEIT');
+    await telePrint('PHASER AUF ZIEL AUSGERICHTET;  ');
+
+    let units = null;
+    while (units === null || units > this.energyLevel || units < 0) {
+      await telePrint(`VERFÜGBARE ENERGIE = ${Math.floor(this.energyLevel)} EINHEITEN`);
+      const raw = await ask('ANZAHL DER EINHEITEN ZUM FEUERN? ');
+      units = parseFloat(raw);
+      if (isNaN(units)) { units = null; continue; }
+      if (units === 0) return false;
+    }
+    this.energyLevel -= units;
+    if (this.damageLevel[8] < 0) units *= Math.random();
+
+    const visRom = [1,2].filter(i => this.r[i] && this.r[i][2] > 0 && !this.r[i][3]);
+    const totalTargets = this.k3 + visRom.length;
+    const h1 = Math.floor(units / Math.max(totalTargets, 1));
+
+    // Klingonen
+    for (let i = 1; i <= 3; i++) {
+      const ke = this.k[i][2];
+      if (ke <= 0) continue;
+      const dist = this._calcDistance(this.k[i][0], this.k[i][1], this.s1, this.s2);
+      const hit  = Math.floor((h1 / dist) * (Math.random() + 2));
+      if (hit <= 0.15 * ke) {
+        await telePrint(`SENSOREN ZEIGEN KEINEN SCHADEN AM FEIND BEI ${this.k[i][0]},${this.k[i][1]}`, 400);
+      } else {
+        this.k[i][2] -= hit;
+        await telePrint(`${hit} EINHEITEN TREFFER AUF KLINGONEN BEI SEKTOR ${this.k[i][0]},${this.k[i][1]}`);
+      }
+      if (this.k[i][2] > 0) {
+        await telePrint(`   (SENSOREN ZEIGEN ${Math.floor(this.k[i][2])} EINHEITEN VERBLEIBEND)`, 800);
+      } else {
+        beep(660,120); beep(880,200);
+        await telePrint('*** KLINGONE VERNICHTET ***', 800);
+        this.k3--; this.shipCondition = this._checkShipStatus(); this.totalKlingonShips--;
+        if (this._checkAllEnemiesDefeated()) return true;
+        this._addElementInQuadrantString('   ', this.k[i][0], this.k[i][1]);
+        this.k[i][2] = 0;
+        this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+      }
+    }
+
+    // Sichtbare Romulaner
+    for (const i of visRom) {
+      const re = this.r[i][2];
+      if (re <= 0 || this.r[i][3]) continue;
+      const dist = this._calcDistance(this.r[i][0], this.r[i][1], this.s1, this.s2);
+      const hit  = Math.floor((h1 / dist) * (Math.random() + 2));
+      if (hit <= 0.15 * re) {
+        await telePrint(`SENSOREN ZEIGEN KEINEN SCHADEN AM ROMULANER BEI ${this.r[i][0]},${this.r[i][1]}`, 400);
+      } else {
+        this.r[i][2] -= hit;
+        await telePrint(`${hit} EINHEITEN TREFFER AUF ROMULANER BEI SEKTOR ${this.r[i][0]},${this.r[i][1]}`);
+      }
+      if (this.r[i][2] > 0) {
+        await telePrint(`   (SENSOREN ZEIGEN ${Math.floor(this.r[i][2])} EINHEITEN VERBLEIBEND)`, 800);
+      } else {
+        beep(660,120); beep(880,200);
+        await telePrint('*** ROMULANER VERNICHTET ***', 800);
+        this.r3--; this.shipCondition = this._checkShipStatus(); this.totalRomulanShips--;
+        if (this._checkAllEnemiesDefeated()) return true;
+        this._addElementInQuadrantString('   ', this.r[i][0], this.r[i][1]);
+        this.r[i][2] = 0;
+        this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+      }
+    }
+    await this._klingonsAttack();
+    await this._romulansAttack();
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHOTONENTORPEDO (TOR)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async firePhotonTorpedoes() {
+    if (this.photonTorpedoes <= 0) { await telePrint('ALLE PHOTONENTORPEDOS VERBRAUCHT.', 1500); return false; }
+    if (this.damageLevel[5] < 0)   { await telePrint('PHOTONENRÖHREN NICHT BETRIEBSBEREIT.', 1500); return false; }
+
+    const cs = await ask('PHOTONENTORPEDO-KURS (1-9)? ');
+    let course = parseFloat(cs);
+    if (isNaN(course)) return false;
+    if (course === 9) course = 1.0;
+    if (course < 0.1 || course > 9) { await telePrint("FÄHNRICH CHEKOV MELDET, 'FALSCHE KURSDATEN, SIR!'"); return false; }
+
+    this.energyLevel -= 2;
+    this.photonTorpedoes -= 1;
+
+    const ci    = Math.floor(course);
+    const cCurr = Game.COURSE_DELTA[ci];
+    const cNext = Game.COURSE_DELTA[ci + 1];
+    const frac  = course - ci;
+    const sx1   = cCurr[0] + (cNext[0] - cCurr[0]) * frac;
+    const sx2   = cCurr[1] + (cNext[1] - cCurr[1]) * frac;
+
+    let x = this.s1, y = this.s2;
+    await telePrint('TORPEDOSPUR:');
+
+    let done = false;
+    while (!done) {
+      x += sx1; y += sx2;
+      const x3 = Math.floor(x + 0.5);
+      const y3 = Math.floor(y + 0.5);
+
+      if (x3 < 1 || x3 > 8 || y3 < 1 || y3 > 8) {
+        await telePrint('TORPEDO VERFEHLT!'); await sleep(1500); break;
+      }
+      await telePrint(`               ${x3} , ${y3}`, 400);
+
+      if (this._searchStringInQuadrant('+K+', x, y)) {
+        beep(660,120); beep(880,200);
+        await telePrint('*** KLINGONE VERNICHTET ***', 800);
+        this.k3--; this.shipCondition = this._checkShipStatus(); this.totalKlingonShips--;
+        if (this._checkAllEnemiesDefeated()) return true;
+        for (let i = 1; i <= 3; i++) if (x3 === this.k[i][0] && y3 === this.k[i][1]) this.k[i][2] = 0;
+        this._addElementInQuadrantString('   ', x, y);
+        this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        done = true;
+      } else if (this._searchStringInQuadrant('{R}', x, y)) {
+        beep(660,120); beep(880,200);
+        await telePrint('*** ROMULANER VERNICHTET ***', 800);
+        this.r3--; this.shipCondition = this._checkShipStatus(); this.totalRomulanShips--;
+        if (this._checkAllEnemiesDefeated()) return true;
+        for (let i = 1; i <= 2; i++) if (x3 === this.r[i][0] && y3 === this.r[i][1]) this.r[i][2] = 0;
+        this._addElementInQuadrantString('   ', x, y);
+        this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        done = true;
+      } else if (this._searchStringInQuadrant(' * ', x, y)) {
+        await telePrint(`STERN BEI ${x3},${y3} ABSORBIERT TORPEDOENERGIE.`, 800); done = true;
+      } else if (this._searchStringInQuadrant('>!<', x, y)) {
+        await telePrint('*** STERNENFLOTTENBASIS VERNICHTET ***', 800);
+        this.b3--; this.totalStarbases--;
+        if (this.totalStarbases > 0 || this.totalKlingonShips > this.stardate - this.t0 - this.maxNumOfDays) {
+          await telePrint('STERNENFLOTTENKOMMANDO ÜBERPRÜFT IHRE AKTE AUF');
+          await telePrint('KRIEGSGERICHTSVERFAHREN!');
+          await sleep(1500);
+          this.shipDocked = false;
+          this._addElementInQuadrantString('   ', x, y);
+          this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+          this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        } else {
+          await telePrint('DAS REICHT, CAPTAIN!! SIE WERDEN HIERMIT DES KOMMANDOS ENTHOBEN');
+          await telePrint('UND ZU 99 STERNDATEN ZWANGSARBEIT AUF CYGNUS 12 VERURTEILT!!');
+          await sleep(1500); this.gameOver = true; return true;
+        }
+        done = true;
+      }
+      // Leerer Raum: continue
+    }
+    await this._klingonsAttack();
+    await this._romulansAttack();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TACHYON-SCAN (TAC)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async tachyonScan() {
+    if (this.r3 <= 0) {
+      await telePrint("MR. SPOCK MELDET, 'TACHYON-SCAN ENTDECKT KEINE ROMULANISCHEN SIGNATUREN");
+      await telePrint("                    IN DIESEM QUADRANTEN.'");
+      return false;
+    }
+    const cost = 50;
+    if (this.energyLevel < cost) { await telePrint(`NICHT GENÜGEND ENERGIE FÜR TACHYON-SCAN (${cost} EINHEITEN ERFORDERLICH).`); return false; }
+    this.energyLevel -= cost;
+    await telePrint('TACHYON-PULS EINGELEITET . . .', 800);
+    beep(600,80); beep(700,80); beep(800,80);
+
+    let revealed = 0;
+    for (let i = 1; i <= this.r3; i++) {
+      if (this.r[i][2] > 0 && this.r[i][3]) {
+        this.r[i][3] = false;
+        this.rJustDecloaked[i] = false;
+        this._addElementInQuadrantString('{R}', this.r[i][0], this.r[i][1]);
+        revealed++;
+      }
+    }
+    if (revealed > 0) {
+      await telePrint(`TACHYON-SCAN ENTHÜLLT ${revealed} GETARNTE ROMULANISCHE WARBIRDS — JETZT AUFGEDECKT`);
+    } else {
+      await telePrint(`TACHYON-SCAN ENTDECKT ${this.r3} ROMULANISCHE WARBIRDS — ALLE BEREITS SICHTBAR`);
+    }
+    await this.shortRangeSensorScan();
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TRIBBLES TRANSPORTIEREN (TRB)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async beamTribbles() {
+    if (!this.tribblesInfested) { await telePrint("MR. SCOTT MELDET: 'ES GIBT KEINE TRIBBLES AN BORD, CAPTAIN.'"); return false; }
+    if (this.k3 <= 0) { await telePrint("MR. SCOTT MELDET: 'KEINE KLINGONENSCHIFFE IN REICHWEITE ZUM TRANSPORTIEREN, CAPTAIN!'"); return false; }
+
+    beep(440,80); beep(330,80); beep(220,200);
+    await telePrint('TRANSPORTERRAUM: TRIBBLES WERDEN ZU KLINGONENSCHIFF TRANSPORTIERT . . .', 800);
+
+    let destroyed = 0;
+    for (let i = 1; i <= 3; i++) {
+      if (this.k[i][2] > 0) {
+        beep(660,120); beep(880,200);
+        await telePrint(`*** KLINGONE BEI SEKTOR ${this.k[i][0]},${this.k[i][1]} VON TRIBBLES ÜBERWÄLTIGT — VERNICHTET ***`, 800);
+        this._addElementInQuadrantString('   ', this.k[i][0], this.k[i][1]);
+        this.k[i][2] = 0; destroyed++;
+      }
+    }
+    this.k3 = 0; this.totalKlingonShips -= destroyed;
+    this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
+    this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+    this.shipCondition = this._checkShipStatus();
+    this.tribblesInfested = false;
+    await telePrint('ENTERPRISE IST JETZT TRIBBLE-FREI!');
+    if (this._checkAllEnemiesDefeated()) return true;
+    await this.shortRangeSensorScan();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SONDEREREIGNISSE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _checkSpecialEvents() {
+    // Harry Mudd
+    if (this.harryMuddQuadrant[0] === this.q1 && this.harryMuddQuadrant[1] === this.q2) {
+      this.harryMuddQuadrant = [0, 0];
+      const stolen = Math.max(1, Math.floor(this.energyLevel * 0.10));
+      beep(350,150); beep(280,200);
+      await telePrint('\n*** HARRY MUDD ERSCHEINT AUF DEM BILDSCHIRM! ***');
+      await telePrint('DER BERÜCHTIGTE SCHWINDLER IST UNBEMERKT AN BORD GEGANGEN UND HAT');
+      await telePrint(`DIE ENERGIERESERVEN DES SCHIFFES ANGEZAPFT -- ${stolen} EINHEITEN GESTOHLEN!`);
+      this.energyLevel = Math.max(0, this.energyLevel - stolen);
+      await telePrint(`ENERGIE JETZT BEI ${Math.floor(this.energyLevel)} EINHEITEN.\n`);
+      await sleep(1200);
+    }
+
+    // Vulkanisches Schiff
+    if (this.vulcanShipQuadrant[0] === this.q1 && this.vulcanShipQuadrant[1] === this.q2) {
+      this.vulcanShipQuadrant = [0, 0];
+      beep(880,100); beep(1100,150); beep(1320,200);
+      await telePrint('\n*** EIN VULKANISCHES FORSCHUNGSSCHIFF RUFT DIE ENTERPRISE ***');
+      await telePrint("'LEBEN SIE LANG UND IN FRIEDEN, CAPTAIN. UNSERE SENSOREN ENTDECKEN");
+      await telePrint(" SCHÄDEN AN IHREM FAHRZEUG. WIR BIETEN HILFE AN.'");
+      for (let i = 1; i <= 8; i++) if (this.damageLevel[i] < 0) this.damageLevel[i] = 0;
+      this.energyLevel = Math.min(this.maxEnergyLevel, this.energyLevel + 500);
+      await telePrint('ALLE BESCHÄDIGTEN SYSTEME WURDEN REPARIERT.');
+      await telePrint(`500 ENERGIEEINHEITEN ÜBERTRAGEN. ENERGIE JETZT BEI ${Math.floor(this.energyLevel)} EINHEITEN.`);
+      if (this.tribblesInfested) {
+        this.tribblesInfested = false;
+        await telePrint('VULKANISCHE BESATZUNG HILFT BEI DER BESEITIGUNG DER TRIBBLE-PLAGE.');
+      }
+      await telePrint('');
+      await sleep(1200);
+    }
+
+    // Händler Cyrano Jones
+    if (this.traderQuadrant[0] === this.q1 && this.traderQuadrant[1] === this.q2) {
+      this.traderQuadrant = [0, 0];
+      beep(440,100); beep(550,120);
+      await telePrint('\n*** CYRANO JONES RUFT DIE ENTERPRISE ***');
+      await telePrint("'ICH HABE WAREN ZU HANDELN, CAPTAIN — EINSCHLIESSLICH TORPEDOVORRÄTE.'");
+      const added = this.maxTorpedoes - Math.floor(this.photonTorpedoes);
+      this.photonTorpedoes = this.maxTorpedoes;
+      if (added > 0) await telePrint(`${added} TORPEDOS NACHGEFÜLLT. RÖHREN JETZT VOLL (${this.maxTorpedoes} GESAMT).`);
+      else await telePrint('TORPEDORÖHREN BEREITS VOLL.');
+      if (Math.random() < 0.50) {
+        this.tribblesInfested = true;
+        beep(300,200);
+        await telePrint('*** TRIBBLES AN BORD DER ENTERPRISE ENTDECKT! ***');
+        await telePrint('DIE KLEINEN KREATUREN HABEN SICH ÜBERALL VERBREITET.');
+        await telePrint('INGENIEURSWESEN: SIE VERBRAUCHEN 200 ENERGIE PRO WARPSPRUNG.');
+        await telePrint("TIPP: BENUTZEN SIE 'TRB' WENN KLINGONEN ANWESEND SIND, UM SIE HINÜBERZUBEAMEN!");
+      } else {
+        await telePrint("'ES WAR MIR EIN VERGNÜGEN, CAPTAIN.'");
+      }
+      await telePrint('');
+      await sleep(1200);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SPIELANLEITUNG
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _printInstructions() {
+    const txt = `
+          *************************************
+          *                                   *
+          *      * * SUPER STAR TREK * *      *
+          *                                   *
+          *************************************
+
+      ANLEITUNG FÜR 'SUPER STAR TREK'
+
+1. WENN SIE 'BEFEHL?' SEHEN, GEBEN SIE EINEN DER GÜLTIGEN
+   BEFEHLE EIN: NAV, SRS, LRS, PHA, TOR, SHE, DAM, COM, TAC, TRB, XXX
+
+2. BEI EINEM UNGÜLTIGEN BEFEHL ERSCHEINT DIE BEFEHLSLISTE.
+
+3. MANCHE BEFEHLE ERFORDERN EINGABEN (Z.B. NAV FRAGT NACH KURS).
+   FALSCHE EINGABEN BRECHEN DEN BEFEHL AB.
+
+   DIE GALAXIS IST IN EIN 8×8 QUADRANTENNETZ EINGETEILT.
+JEDER QUADRANT IST NOCHMALS IN 8×8 SEKTOREN UNTERTEILT.
+
+   SIE ÜBERNEHMEN DAS KOMMANDO ÜBER DIE USS ENTERPRISE.
+IHR AUFTRAG: VERNICHTEN SIE ALLE KLINGONEN UND ROMULANISCHEN WARBIRDS.
+
+   KLINGONEN SIND DIREKT UND AGGRESSIV.
+   ROMULANER SIND LISTIG: SIE BENUTZEN TARNVORRICHTUNGEN ({R})
+UND KÖNNEN NACH EINEM ANGRIFF VERSCHWINDEN.
+
+   BENUTZEN SIE 'TAC' (TACHYON-SCAN, KOSTET 50 ENERGIE) UM GETARNTE
+ROMULANER ZU ENTDECKEN. PHASER UND TORPEDOS KÖNNEN GETARNTE SCHIFFE
+NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
+`;
+    await telePrint(txt, 0);
+    await ask('-- DRÜCKEN SIE ENTER UM FORTZUFAHREN ');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HAUPTSCHLEIFE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async run() {
+    // Enterprise ASCII-Art
+    await telePrint('', 0);
+    await telePrint('                                    ,------*------,', 0);
+    await telePrint("                ,-------------   '---  ------'",     0);
+    await telePrint("                 '-------- --'      / /",             0);
+    await telePrint("                     ,---' '-------/ /--,",           0);
+    await telePrint("                      '----------------'",             0);
+    await telePrint('                DIE USS ENTERPRISE --- NCC-1701',      0);
+    await telePrint('', 0);
+
+    // Anleitung?
+    const ins = await ask('BENÖTIGEN SIE ANLEITUNG (J/N)? ');
+    if (ins.toUpperCase() === 'J') await this._printInstructions();
+
+    this._initGalaxy();
+
+    const bs = this.totalStarbases > 1 ? 'STERNENBASEN' : 'STERNENBASIS';
+    const bv = this.totalStarbases > 1 ? ' SIND' : ' IST';
+    await telePrint('IHRE BEFEHLE LAUTEN WIE FOLGT:');
+    await telePrint(` VERNICHTEN SIE DIE ${this.totalKlingonShips} KLINGONISCHEN KRIEGSSCHIFFE UND ${this.totalRomulanShips} ROMULANISCHEN WARBIRDS`);
+    await telePrint(' DIE IN DIE GALAXIS EINGEDRUNGEN SIND, BEVOR SIE DAS FÖDERATIONSHAUPTQUARTIER ANGREIFEN KÖNNEN');
+    await telePrint(` BIS ZUM STERNDATUM ${this.t0 + this.maxNumOfDays}. DAS GIBT IHNEN ${this.maxNumOfDays} TAGE.`);
+    await telePrint(" VORSICHT: ROMULANER BENUTZEN TARNVORRICHTUNGEN. BENUTZEN SIE 'TAC' FÜR TACHYON-SCAN.");
+    await telePrint(` ES${bv} ${this.totalStarbases} ${bs} IN DER GALAXIS ZUM NACHVERSORGEN IHRES SCHIFFES.`);
+    await telePrint('');
+    await sleep(800);
+
+    this.q4 = 0; this.q5 = 0;
+
+    // ── ÄUSSERE SCHLEIFE (pro Quadrant) ──────────────────────────────────────
+    while (!this.gameOver) {
+      this.k3 = 0; this.r3 = 0; this.b3 = 0; this.s3 = 0;
+      this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+
+      const qName = this._getQuadrantName(this.q1, this.q2);
+      await telePrint('');
+      if (this.t0 === this.stardate)
+        await telePrint(`IHR AUFTRAG BEGINNT IN QUADRANT: ${qName}`);
+      else
+        await telePrint(`EINFLUG IN DEN '${qName}'-QUADRANTEN`);
+      await telePrint('');
+
+      const packed = this.galaxy[this.q1][this.q2];
+      this.k3 = Math.floor(packed * 0.001);
+      this.r3 = Math.floor(packed * 0.01) - 10 * this.k3;
+      this.b3 = Math.floor(packed * 0.1)  - 100 * this.k3 - 10 * this.r3;
+      this.s3 = packed - 1000 * this.k3 - 100 * this.r3 - 10 * this.b3;
+
+      if (this.k3 > 0) {
+        await telePrint('** ROTER ALARM **  KLINGONISCHE SCHIFFE IN DIESEM QUADRANTEN');
+        if (this.shieldLevel <= 200) await telePrint('   SCHILDE GEFÄHRLICH NIEDRIG');
+        await sleep(800);
+      }
+
+      // Reset Gegner
+      for (let i = 1; i <= 3; i++) this.k[i] = [0, 0, 0];
+      for (let i = 1; i <= 2; i++) { this.r[i] = [0, 0, 0, false]; this.rJustDecloaked[i] = false; }
+      this.quadString = ' '.repeat(192);
+
+      // Enterprise platzieren
+      this._addElementInQuadrantString('<*>', this.s1, this.s2);
+
+      // Klingonen platzieren
+      for (let i = 1; i <= this.k3; i++) {
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        this._addElementInQuadrantString('+K+', r1, r2);
+        this.k[i] = [r1, r2, this.klingonBaseEnergy * (0.5 + Math.random())];
+      }
+
+      // Romulaner platzieren (50% starten getarnt)
+      for (let i = 1; i <= this.r3; i++) {
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        const cloaked = Math.random() < 0.5;
+        this.r[i] = [r1, r2, this.romulanBaseEnergy * (0.5 + Math.random()), cloaked];
+        this._addElementInQuadrantString('{R}', r1, r2);
+        if (cloaked) this._addElementInQuadrantString('   ', r1, r2);
+      }
+
+      // Rot-Alarm nur wenn sichtbare Romulaner (und keine Klingonen)
+      const visRom = Array.from({length: this.r3}, (_,i)=>i+1)
+        .filter(i => this.r[i][2] > 0 && !this.r[i][3]).length;
+      if (this.k3 === 0 && visRom > 0) {
+        await telePrint('** ROTER ALARM **  ROMULANISCHE SCHIFFE IN DIESEM QUADRANTEN');
+        if (this.shieldLevel <= 200) await telePrint('   SCHILDE GEFÄHRLICH NIEDRIG');
+        await sleep(800);
+      }
+
+      // Sternenbasis platzieren
+      if (this.b3 > 0) {
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        this.b4 = r1; this.b5 = r2;
+        this._addElementInQuadrantString('>!<', r1, r2);
+      }
+
+      // Sterne platzieren
+      for (let s = 0; s < this.s3; s++) {
+        const [r1, r2] = this._findEmptyPlaceInQuadrant();
+        this._addElementInQuadrantString(' * ', r1, r2);
+      }
+
+      await this._checkSpecialEvents();
+      await this._checkIfDocked();
+
+      // Hinweis auf getarnte Romulaner (50% Chance)
+      const cloakedPresent = Array.from({length: this.r3}, (_,i)=>i+1)
+        .some(i => this.r[i][2] > 0 && this.r[i][3]);
+      if (cloakedPresent && Math.random() < 0.5) {
+        await telePrint("LT. UHURA MELDET: 'CAPTAIN, SUBRAUM-INTERFERENZ ENTDECKT.");
+        await telePrint("                   HERKUNFT UNBEKANNT — KÖNNTE EIN TARNFELD SEIN.'");
+      }
+
+      await this.shortRangeSensorScan();
+
+      // ── INNERE SCHLEIFE (Befehlseingabe) ─────────────────────────────────
+      let newQuadrant = false;
+      while (!newQuadrant && !this.gameOver) {
+        if (this.energyLevel + this.shieldLevel <= 10 ||
+            (this.energyLevel <= 10 && this.damageLevel[7] < 0)) {
+          await telePrint('\n** SCHWERER FEHLER **   SIE HABEN IHR SCHIFF IM WELTALL GESTRANDET');
+          await telePrint('SIE HABEN NICHT GENÜGEND MANÖVRIERENERGIE, UND DIE SCHILDSTEUERUNG');
+          await telePrint('IST DERZEIT NICHT IN DER LAGE, ZUM MASCHINENRAUM UMZULEITEN!!');
+          await sleep(1500);
+          this.gameOver = true;
+          break;
+        }
+
+        this._srsShown = false;
+        const cmd = (await ask('BEFEHL? ')).toUpperCase();
+        clearScreen();
+
+        if      (cmd === 'NAV') newQuadrant = await this.courseControl();
+        else if (cmd === 'SRS') await this.shortRangeSensorScan();
+        else if (cmd === 'LRS') await this.longRangeSensorScan();
+        else if (cmd === 'PHA') await this.firePhasers();
+        else if (cmd === 'TOR') await this.firePhotonTorpedoes();
+        else if (cmd === 'SHE') await this.shieldControl();
+        else if (cmd === 'DAM') await this.damageControl();
+        else if (cmd === 'COM') await this.libraryComputer();
+        else if (cmd === 'TAC') await this.tachyonScan();
+        else if (cmd === 'TRB') await this.beamTribbles();
+        else if (cmd === 'XXX' || cmd === 'EXIT') { this.gameOver = true; }
+        else {
+          await telePrint('BEFEHLE:  NAV  SRS  LRS  PHA  TOR  SHE  DAM  COM  TAC  TRB  XXX');
+        }
+
+        // Bildschirm automatisch mit SRS neu zeichnen wenn nicht bereits geschehen
+        if (!this._srsShown && !newQuadrant && !this.gameOver) {
+          await this.shortRangeSensorScan();
+        }
+      }
+    }
+
+    // ── SPIELENDE ───────────────────────────────────────────────────────────
+    await telePrint('');
+    if (this.totalKlingonShips > 0)
+      await telePrint(`ES VERBLIEBEN ${this.totalKlingonShips} KLINGONISCHE KAMPFKREUZER AM ENDE IHRER MISSION, STERNDATUM ${this._roundTo(this.stardate, 1)}`);
+    if (this.totalRomulanShips > 0)
+      await telePrint(`ES VERBLIEBEN ${this.totalRomulanShips} ROMULANISCHE WARBIRDS AM ENDE IHRER MISSION, STERNDATUM ${this._roundTo(this.stardate, 1)}`);
+    await telePrint('\n\nDanke fürs Spielen!');
+    await telePrint('\nJavaScript-Port 2026 — Original-Lua-Konvertierung von Emanuele Bolognesi\n');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function startGame() {
+  $term.innerHTML = '';
+  $irow.style.display = 'none';
+  const game = new Game();
+  try {
+    await game.run();
+  } catch (err) {
+    await telePrint('FEHLER: ' + err.message, 0);
+    console.error(err);
+  }
+  const btn = document.createElement('button');
+  btn.textContent = '\u25B6  Neues Spiel';
+  btn.className   = 'restart-btn';
+  btn.onclick     = startGame;
+  $term.appendChild(btn);
+  $term.scrollTop = $term.scrollHeight;
+}
+
+window.addEventListener('load', startGame);
+</script>
+</body>
+</html>
