@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Star Trek – Handbuch</title>
+  <style>
+    :root {
+      --green:   #00cc44;
+      --dim:     #008833;
+      --bright:  #88ffaa;
+      --yellow:  #ffcc00;
+      --red:     #ff4444;
+      --blue:    #44aaff;
+      --bg:      #050f05;
+      --bg2:     #0a1a0a;
+      --border:  #1a3a1a;
+      --code-bg: #020a02;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--green);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      line-height: 1.65;
+      padding: 0;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────────────────── */
+    header {
+      background: var(--bg2);
+      border-bottom: 2px solid var(--dim);
+      padding: 28px 40px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 1.7rem;
+      letter-spacing: .08em;
+      color: var(--bright);
+      text-shadow: 0 0 18px #00ff6644;
+    }
+    header h1 span { color: var(--yellow); }
+    header .badge {
+      font-size: .78rem;
+      color: var(--dim);
+      letter-spacing: .06em;
+    }
+    header a.play-btn {
+      display: inline-block;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      padding: 6px 18px;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: .85rem;
+      letter-spacing: .1em;
+      transition: background .15s, color .15s;
+    }
+    header a.play-btn:hover { background: var(--green); color: #000; }
+
+    /* ── LAYOUT ─────────────────────────────────────────────────────────── */
+    .page { display: flex; max-width: 1100px; margin: 0 auto; }
+
+    /* ── NAV SIDEBAR ─────────────────────────────────────────────────────── */
+    nav {
+      width: 210px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      overflow-y: auto;
+      padding: 24px 12px 24px 20px;
+      border-right: 1px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: var(--dim) transparent;
+    }
+    nav ul { list-style: none; }
+    nav > ul > li { margin-bottom: 4px; }
+    nav > ul > li > a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: .82rem;
+      letter-spacing: .04em;
+      display: block;
+      padding: 2px 0;
+      transition: color .12s;
+    }
+    nav > ul > li > a:hover { color: var(--bright); }
+    nav > ul > li.section > a { color: var(--green); font-weight: bold; margin-top: 12px; }
+    nav .sub { padding-left: 12px; }
+    nav .sub a { color: #005522; font-size: .78rem; }
+    nav .sub a:hover { color: var(--green); }
+
+    /* ── MAIN CONTENT ────────────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      min-width: 0;
+      padding: 32px 40px 60px;
+    }
+
+    .intro-box {
+      border: 1px solid var(--dim);
+      background: var(--bg2);
+      padding: 14px 20px;
+      margin-bottom: 32px;
+      color: var(--bright);
+      font-style: italic;
+    }
+
+    h2 {
+      color: var(--bright);
+      font-size: 1.15rem;
+      letter-spacing: .08em;
+      margin: 40px 0 14px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border);
+    }
+    h2:first-child { margin-top: 0; }
+
+    h3 {
+      color: var(--yellow);
+      font-size: .98rem;
+      letter-spacing: .06em;
+      margin: 26px 0 10px;
+    }
+
+    h4 {
+      color: var(--green);
+      font-size: .9rem;
+      margin: 18px 0 8px;
+    }
+
+    p { margin-bottom: 10px; }
+
+    a { color: var(--blue); }
+    a:hover { color: var(--bright); }
+
+    strong { color: var(--bright); }
+    em { color: var(--dim); font-style: italic; }
+
+    /* ── CODE ────────────────────────────────────────────────────────────── */
+    code {
+      background: var(--code-bg);
+      color: var(--yellow);
+      padding: 1px 5px;
+      font-family: inherit;
+      font-size: .92em;
+      border: 1px solid #1a2a0a;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--dim);
+      padding: 12px 16px;
+      overflow-x: auto;
+      margin: 10px 0 18px;
+      font-size: .85rem;
+      line-height: 1.5;
+      color: #88cc88;
+      white-space: pre;
+    }
+    pre .cmd     { color: var(--yellow); }
+    pre .output  { color: #88cc88; }
+    pre .warn    { color: var(--red); }
+    pre .special { color: var(--blue); }
+
+    /* ── BLOCKQUOTE ──────────────────────────────────────────────────────── */
+    blockquote {
+      border-left: 3px solid var(--yellow);
+      margin: 14px 0;
+      padding: 8px 16px;
+      color: #aacc88;
+      background: #0a1400;
+    }
+    blockquote strong { color: var(--yellow); }
+
+    /* ── TABLES ──────────────────────────────────────────────────────────── */
+    table {
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      width: 100%;
+      font-size: .88rem;
+    }
+    th {
+      background: var(--bg2);
+      color: var(--bright);
+      padding: 6px 12px;
+      text-align: left;
+      border: 1px solid var(--border);
+      letter-spacing: .05em;
+    }
+    td {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #060d06; }
+    td code { font-size: .88em; }
+
+    /* ── LISTS ───────────────────────────────────────────────────────────── */
+    ul, ol {
+      padding-left: 22px;
+      margin-bottom: 12px;
+    }
+    li { margin-bottom: 4px; }
+    ol li { color: var(--green); }
+
+    /* ── SYMBOLS ─────────────────────────────────────────────────────────── */
+    .sym-ent  { color: var(--bright); font-weight: bold; }
+    .sym-kling { color: var(--red); font-weight: bold; }
+    .sym-rom  { color: #cc44ff; font-weight: bold; }
+    .sym-base { color: var(--blue); font-weight: bold; }
+    .sym-star { color: var(--yellow); }
+
+    /* ── CONDITION BADGES ────────────────────────────────────────────────── */
+    .cond { display: inline-block; padding: 1px 7px; font-size: .82em; font-weight: bold; }
+    .cond-green  { background: #003300; color: #00ff44; border: 1px solid #00aa22; }
+    .cond-yellow { background: #2a1a00; color: #ffcc00; border: 1px solid #aa8800; }
+    .cond-red    { background: #2a0000; color: #ff4444; border: 1px solid #aa0000; }
+    .cond-docked { background: #001a2a; color: #44aaff; border: 1px solid #0066aa; }
+
+    /* ── COMMAND CARDS ───────────────────────────────────────────────────── */
+    .cmd-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+      margin: 16px 0 24px;
+    }
+    .cmd-card {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 10px 14px;
+      text-align: center;
+    }
+    .cmd-card .cmd-name { color: var(--yellow); font-size: 1.1rem; font-weight: bold; letter-spacing: .1em; }
+    .cmd-card .cmd-desc { color: var(--dim); font-size: .78rem; margin-top: 4px; }
+
+    /* ── STRATEGY STEPS ──────────────────────────────────────────────────── */
+    .strategy ol { counter-reset: steps; list-style: none; padding: 0; }
+    .strategy ol li {
+      counter-increment: steps;
+      padding: 6px 10px 6px 38px;
+      position: relative;
+      border-left: 2px solid var(--border);
+      margin-bottom: 6px;
+    }
+    .strategy ol li::before {
+      content: counter(steps);
+      position: absolute;
+      left: 10px;
+      top: 6px;
+      color: var(--yellow);
+      font-weight: bold;
+      font-size: .85rem;
+    }
+
+    /* ── HR ──────────────────────────────────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+
+    /* ── FOOTER ──────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 20px;
+      color: var(--dim);
+      font-size: .8rem;
+    }
+
+    /* ── SCROLLBAR ───────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 3px; }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+    @media (max-width: 740px) {
+      nav { display: none; }
+      header { padding: 16px 20px; }
+      main { padding: 20px 18px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&#x2554;&#x2550; <span>SUPER STAR TREK</span> &#x2550;&#x2557;</h1>
+    <div class="badge">USS ENTERPRISE NCC-1701 &nbsp;&#x2551;&nbsp; STERNENFLOTTENSIMULATION &nbsp;&#x2551;&nbsp; STARDATE 2140</div>
+  </div>
+  <a class="play-btn" href="superstartrek.html">&#x25BA; SPIEL STARTEN</a>
+</header>
+
+<div class="page">
+
+  <!-- ── SIDEBAR ── -->
+  <nav aria-label="Inhaltsverzeichnis">
+    <ul>
+      <li class="section"><a href="#starten">Starten</a></li>
+      <li class="section"><a href="#universum">Das Universum</a></li>
+      <li class="section"><a href="#befehle">Befehle</a></li>
+      <li>
+        <ul class="sub">
+          <li><a href="#nav">NAV – Navigation</a></li>
+          <li><a href="#srs">SRS – Kurzstrecke</a></li>
+          <li><a href="#lrs">LRS – Langstrecke</a></li>
+          <li><a href="#pha">PHA – Phaser</a></li>
+          <li><a href="#tor">TOR – Torpedo</a></li>
+          <li><a href="#she">SHE – Schilde</a></li>
+          <li><a href="#dam">DAM – Schaden</a></li>
+          <li><a href="#com">COM – Computer</a></li>
+          <li><a href="#tac">TAC – Tachyon</a></li>
+          <li><a href="#trb">TRB – Tribbles</a></li>
+          <li><a href="#xxx">XXX – Aufgeben</a></li>
+        </ul>
+      </li>
+      <li class="section"><a href="#romulaner">Romulaner</a></li>
+      <li class="section"><a href="#ereignisse">Zufallsereignisse</a></li>
+      <li class="section"><a href="#energie">Energie</a></li>
+      <li class="section"><a href="#schaden">Schaden</a></li>
+      <li class="section"><a href="#zeitlimit">Zeitlimit</a></li>
+      <li class="section"><a href="#strategie">Schnellstart</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── MAIN ── -->
+  <main>
+
+    <div class="intro-box">
+      Du übernimmst das Kommando über die USS Enterprise NCC-1701. Irgendwo da draußen lauern Klingonen. Viel Glück, Captain.
+    </div>
+
+    <!-- STARTEN -->
+    <h2 id="starten">Starten</h2>
+    <p><code>superstartrek.html</code> im Browser öffnen – kein Server, keine Installation nötig.</p>
+    <p>Einfach die Datei doppelklicken oder per Drag&nbsp;&amp;&nbsp;Drop in Chrome / Firefox / Edge ziehen.</p>
+    <blockquote>Die Python-Ursprungsversion liegt unter <code>legacy/superstartrek.py</code> (nur als Referenz).</blockquote>
+
+    <!-- UNIVERSUM -->
+    <h2 id="universum">Das Universum</h2>
+    <p>Die Galaxis ist ein <strong>8×8-Raster aus Quadranten</strong>. Jeder Quadrant ist nochmal in <strong>8×8 Sektoren</strong> unterteilt – dort bewegt sich die Enterprise auf Impulsantrieb.</p>
+
+    <table>
+      <thead><tr><th>Symbol</th><th>Bedeutung</th></tr></thead>
+      <tbody>
+        <tr><td><code class="sym-ent">&lt;*&gt;</code></td><td>Enterprise (du)</td></tr>
+        <tr><td><code class="sym-kling">+K+</code></td><td>Klingonen-Kampfkreuzer</td></tr>
+        <tr><td><code class="sym-rom">{R}</code></td><td>Romulanischer Warbird (sichtbar)</td></tr>
+        <tr><td><code class="sym-base">&gt;!&lt;</code></td><td>Sternenflottenbasis</td></tr>
+        <tr><td><code class="sym-star">&nbsp;*&nbsp;</code></td><td>Stern (unbeweglich, blockiert Torpedos)</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Ziel:</strong> Alle Klingonen <strong>und</strong> romulanischen Warbirds vernichten, bevor die Zeit abläuft.</p>
+
+    <!-- BEFEHLE ÜBERSICHT -->
+    <h2 id="befehle">Befehle</h2>
+    <p>Eingabe immer GROSS. Alle Befehle sind dreistellige Kürzel.</p>
+
+    <div class="cmd-grid">
+      <div class="cmd-card"><div class="cmd-name">NAV</div><div class="cmd-desc">Kurs &amp; Warp</div></div>
+      <div class="cmd-card"><div class="cmd-name">SRS</div><div class="cmd-desc">Kurzstrecken-Scan</div></div>
+      <div class="cmd-card"><div class="cmd-name">LRS</div><div class="cmd-desc">Langstrecken-Scan</div></div>
+      <div class="cmd-card"><div class="cmd-name">PHA</div><div class="cmd-desc">Phaser feuern</div></div>
+      <div class="cmd-card"><div class="cmd-name">TOR</div><div class="cmd-desc">Torpedo feuern</div></div>
+      <div class="cmd-card"><div class="cmd-name">SHE</div><div class="cmd-desc">Schilde</div></div>
+      <div class="cmd-card"><div class="cmd-name">DAM</div><div class="cmd-desc">Schadenskontrolle</div></div>
+      <div class="cmd-card"><div class="cmd-name">COM</div><div class="cmd-desc">Bordcomputer</div></div>
+      <div class="cmd-card"><div class="cmd-name">TAC</div><div class="cmd-desc">Tachyon-Scan</div></div>
+      <div class="cmd-card"><div class="cmd-name">TRB</div><div class="cmd-desc">Tribbles beamen</div></div>
+      <div class="cmd-card"><div class="cmd-name">XXX</div><div class="cmd-desc">Aufgeben</div></div>
+    </div>
+
+    <!-- NAV -->
+    <h3 id="nav"><code>NAV</code> – Kurs und Warp</h3>
+    <p>Bewegt die Enterprise. Kurs 1–8 (oder 9 = 1), Warp 0.1–8.<br>
+    Warp 1 = eine Quadrantenlänge. Je schneller, desto mehr Energie.</p>
+
+    <pre>Kurssystem:
+  4  3  2
+   \ | /
+    \|/
+5 ---*--- 1
+    /|\
+   / | \
+  6  7  8</pre>
+
+    <blockquote><strong>Tipp:</strong> Warp 0.2–0.9 spart Energie, braucht aber mehrere NAV-Befehle bis zum Ziel.</blockquote>
+
+    <!-- SRS -->
+    <h3 id="srs"><code>SRS</code> – Kurzstrecken-Scan</h3>
+    <p>Zeigt den aktuellen Quadranten + Statusleiste: Energie, Schilde, Torpedos, Sterndatum, Zustand.</p>
+    <p><strong>Zustand (CONDITION):</strong></p>
+    <p>
+      <span class="cond cond-green">GRÜN</span> &nbsp;– alles normal &nbsp;&nbsp;
+      <span class="cond cond-yellow">GELB</span> &nbsp;– Energie unter 10 % &nbsp;&nbsp;
+      <span class="cond cond-red">ROTER ALARM</span> &nbsp;– Feinde im Quadrant &nbsp;&nbsp;
+      <span class="cond cond-docked">ANGEDOCKT</span> &nbsp;– an Basis (Auffüllen)
+    </p>
+
+    <!-- LRS -->
+    <h3 id="lrs"><code>LRS</code> – Langstrecken-Scan</h3>
+    <p>Zeigt die 3×3 Quadranten um die Enterprise herum. Format: <code>KBS</code> (K = Klingonen, B = Basen, S = Sterne).<br>
+    <code>207</code> bedeutet: 2 Klingonen, keine Basis, 7 Sterne.</p>
+    <pre>LANGSTRECKEN-SCAN FÜR QUADRANT 2,4
+-------------------
+: *** : 003 : 104 :
+-------------------
+: 002 : 006 : 207 :
+-------------------
+: *** : 011 : 001 :
+-------------------</pre>
+    <p>Die Enterprise steht in der Mitte (<code>006</code> = kein Klingone, keine Basis, 6 Sterne). Rechts oben (<code>104</code>) lauern 1 Klingone und eine Basis.</p>
+
+    <!-- PHA -->
+    <h3 id="pha"><code>PHA</code> – Phaser</h3>
+    <p>Feuert Phaserenergie auf alle Feinde im Quadrant. Energie wird gleichmäßig aufgeteilt. Entfernung beeinflusst den Schaden: je näher, desto mehr Treffer.</p>
+    <pre>PHASER GESPERRT AUF ZIEL;
+ENERGIE VERFÜGBAR = 2340 EINHEITEN
+ANZAHL DER EINHEITEN ZUM FEUERN? 800
+
+412 EINHEITEN TREFFER AUF KLINGONEN BEI SEKTOR 2,6
+   (SENSOREN ZEIGEN 87 EINHEITEN VERBLEIBEND)
+388 EINHEITEN TREFFER AUF KLINGONEN BEI SEKTOR 6,3
+*** KLINGONE ZERSTÖRT ***</pre>
+
+    <!-- TOR -->
+    <h3 id="tor"><code>TOR</code> – Photonentorpedo</h3>
+    <p>Feuert einen Torpedo in eine Richtung (Kurs 1–9). Treffer auf Klingonen/Romulaner = sofortige Zerstörung. Treffer auf Stern = absorbiert. <strong>Basis treffen ist fatal.</strong></p>
+    <blockquote>Torpedos kosten keine Energie, aber du hast nur 10 Stück. Nachfüllen nur an einer Basis.</blockquote>
+
+    <!-- SHE -->
+    <h3 id="she"><code>SHE</code> – Schilde</h3>
+    <p>Legt Energie in die Schilde. Schild- und Schiffsenergie teilen sich denselben Pool von 3000 Einheiten. Du gibst den <strong>absoluten Zielwert</strong> für die Schilde an.</p>
+    <pre>VERFÜGBARE ENERGIE = 3000  (SCHIFFE: 3000, SCHILDE: 0)
+ANZAHL DER EINHEITEN FÜR SCHILDE? 500
+BERICHT DER DEFLEKTOR-SCHALTSTELLE:
+  'SCHILDE JETZT BEI 500 EINHEITEN GEMÄSS IHREM BEFEHL.'</pre>
+    <blockquote>Ohne Schilde trifft jeder Treffer direkt den Energievorrat.</blockquote>
+
+    <!-- DAM -->
+    <h3 id="dam"><code>DAM</code> – Schadenskontrolle</h3>
+    <p>Zeigt den Zustand aller 8 Bordsysteme. Negative Werte = beschädigt. Beim Andocken an einer Basis kann repariert werden (kostet Stardates).</p>
+    <pre>GERÄT                   REPARATURZUSTAND
+WARPANTRIEB                      0.0
+KURZSTRECKENSENSOREN             0.0
+LANGSTRECKENSENSOREN             0.0
+PHASERSTEUERUNG                  0.0
+TORPEDOROHRE                    -2.4
+SCHADENSKONTROLLE                0.0
+SCHILDSTEUERUNG                  0.0
+BORDCOMPUTER                     0.0</pre>
+
+    <!-- COM -->
+    <h3 id="com"><code>COM</code> – Bordcomputer</h3>
+    <p>Sechs Unteroptionen (Eingabe: <code>0</code>–<code>5</code>):</p>
+    <table>
+      <thead><tr><th>Option</th><th>Funktion</th></tr></thead>
+      <tbody>
+        <tr><td><code>0</code></td><td>Kumulative Galaktische Karte (alle gescannten Quadranten)</td></tr>
+        <tr><td><code>1</code></td><td>Statusbericht (Klingonen, Basen, Stardates)</td></tr>
+        <tr><td><code>2</code></td><td>Torpedodaten (Kurs und Entfernung zu Klingonen)</td></tr>
+        <tr><td><code>3</code></td><td>Basiskurs (Richtung zur nächsten Basis)</td></tr>
+        <tr><td><code>4</code></td><td>Kurs-/Entfernungsrechner</td></tr>
+        <tr><td><code>5</code></td><td>Galaktische Regionskarte</td></tr>
+      </tbody>
+    </table>
+    <blockquote><strong>Tipp:</strong> <code>COM 2</code> gibt dir den genauen Torpedokurs – unbedingt vor <code>TOR</code> nutzen.</blockquote>
+
+    <!-- TAC -->
+    <h3 id="tac"><code>TAC</code> – Tachyon-Scan</h3>
+    <p>Kostet <strong>50 Energie</strong>. Enttarnt alle getarnten Romulaner im aktuellen Quadrant dauerhaft für diese Runde.</p>
+    <ul>
+      <li>Nur sinnvoll wenn der LRS Romulaner anzeigt, aber <code>SRS</code> keinen <code>{R}</code> zeigt</li>
+      <li>Nach dem Scan werden enttarnte Romulaner als <code class="sym-rom">{R}</code> angezeigt und können bekämpft werden</li>
+    </ul>
+
+    <!-- TRB -->
+    <h3 id="trb"><code>TRB</code> – Tribbles beamen</h3>
+    <p>Überträgt die Tribble-Plage aufs Klingonenschiff. <strong>Zerstört alle Klingonen</strong> im Quadrant auf einen Schlag und befreit die Enterprise von den Tribbles.</p>
+    <ul>
+      <li>Nur verfügbar wenn Tribbles an Bord <strong>und</strong> mindestens ein Klingone im Quadrant</li>
+      <li>Funktioniert <em>nicht</em> gegen Romulaner</li>
+    </ul>
+
+    <!-- XXX -->
+    <h3 id="xxx"><code>XXX</code> – Aufgeben</h3>
+    <p>Beendet das Spiel sofort. Kein Urteil.</p>
+
+    <hr>
+
+    <!-- ROMULANER -->
+    <h2 id="romulaner">Romulaner</h2>
+    <p>Romulaner sind listig und gefährlich. Im Gegensatz zu Klingonen verfügen sie über <strong>Tarnvorrichtungen</strong>.</p>
+
+    <h4>Tarnmechanik</h4>
+    <ul>
+      <li><strong>Beim Einflug</strong> startet jeder Romulaner mit 50 % Wahrscheinlichkeit getarnt (unsichtbar, nicht treffbar)</li>
+      <li>Getarnte Romulaner verbrauchen pro Runde <strong>15 Energie</strong>; läuft ihre Energie aus, werden sie zerstört</li>
+      <li><strong>10 % Chance</strong> pro Runde: Tarnfeld bricht unfreiwillig zusammen</li>
+      <li>Sichtbare Romulaner tarnen sich nach dem Angriff mit <strong>70 % Wahrscheinlichkeit</strong> sofort wieder</li>
+      <li>Phaser und Torpedos können <strong>nicht</strong> auf getarnte Romulaner abgefeuert werden</li>
+      <li>Nutze <code>TAC</code> (50 Energie) um alle Getarnten im Quadrant aufzudecken</li>
+    </ul>
+
+    <h4>LRS-Hinweis</h4>
+    <p>Der Langstrecken-Scan zeigt Romulaner mit leichten Anzeigefehlern (±1) – eine Täuschungsmaßnahme.</p>
+
+    <h4>Hinterhalt</h4>
+    <p>Wenn ein Romulaner in dieser Runde enttarnt wird und <strong>sofort danach</strong> angreift, kann er Doppelschaden verursachen. <strong>Schilde hochhalten!</strong></p>
+
+    <hr>
+
+    <!-- EREIGNISSE -->
+    <h2 id="ereignisse">Zufallsereignisse</h2>
+    <p>Beim Spielstart werden <strong>drei Quadranten</strong> zufällig mit Sonderereignissen belegt. Du weißt nicht welche – du fliegst hinein und das Ereignis löst sich aus.</p>
+
+    <h4>Harry Mudd</h4>
+    <p>Der berüchtigte Schwindler beamt sich unentdeckt an Bord und stiehlt <strong>10 % deiner aktuellen Energie</strong>.</p>
+
+    <h4>Vulkanisches Forschungsschiff</h4>
+    <p>Ein vulkanischer Kreuzer bietet Hilfe an: alle beschädigten Systeme sofort repariert, <strong>+500 Energie</strong>, Tribbles entfernt (falls vorhanden).</p>
+
+    <h4>Cyrano Jones – Händler</h4>
+    <p>Füllt die <strong>Torpedovorräte auf Maximum</strong> auf – aber mit <strong>50 % Chance</strong> kommen Tribbles mit an Bord.</p>
+    <ul>
+      <li>Tribble-Befall: jeder Warp-Sprung kostet <strong>zusätzlich 200 Energie</strong></li>
+      <li>Nutze <code>TRB</code> wenn Klingonen im Quadrant sind, um sie loszuwerden (und Klingonen gleich mit)</li>
+      <li>Das Vulkanische Schiff entfernt Tribbles ebenfalls</li>
+    </ul>
+
+    <hr>
+
+    <!-- ENERGIE -->
+    <h2 id="energie">Energie &amp; Überleben</h2>
+    <p>Die Enterprise startet mit <strong>3000 Energieeinheiten</strong> (Schilde + Antrieb + Waffen teilen sich diesen Pool).</p>
+    <table>
+      <thead><tr><th>Aktion</th><th>Kosten</th></tr></thead>
+      <tbody>
+        <tr><td>Bewegen (NAV)</td><td><code>Warp × 8 + 10</code> Einheiten</td></tr>
+        <tr><td>Phaser</td><td>so viel wie angegeben</td></tr>
+        <tr><td>Torpedo</td><td>2 Einheiten pro Schuss</td></tr>
+        <tr><td>Tachyon-Scan (TAC)</td><td>50 Einheiten</td></tr>
+        <tr><td>Tribble-Befall (Warp)</td><td>+200 Einheiten extra</td></tr>
+        <tr><td>Andocken an Basis</td><td>alles wird aufgefüllt ✓</td></tr>
+      </tbody>
+    </table>
+    <blockquote>Wenn Energie + Schilde ≤ 10, ist das Spiel verloren – die Enterprise treibt antriebslos.</blockquote>
+
+    <!-- SCHADEN -->
+    <h2 id="schaden">Schaden</h2>
+    <p>Systeme können durch Treffer beschädigt werden (negativer Repair-Wert):</p>
+    <table>
+      <thead><tr><th>System</th><th>Effekt bei Schaden</th></tr></thead>
+      <tbody>
+        <tr><td>Warpantrieb</td><td>Maximalwarp: 0.2</td></tr>
+        <tr><td>Kurzstreckensensoren</td><td>SRS zeigt nichts</td></tr>
+        <tr><td>Langstreckensensoren</td><td>LRS nicht nutzbar</td></tr>
+        <tr><td>Phasersteuerung</td><td>nicht feuerfähig</td></tr>
+        <tr><td>Torpedorohre</td><td>keine Torpedos</td></tr>
+        <tr><td>Schadenskontrolle</td><td>DAM-Report nicht verfügbar</td></tr>
+        <tr><td>Schildsteuerung</td><td>keine Schilde einstellbar</td></tr>
+        <tr><td>Bordcomputer</td><td>PHA ungenauer, COM deaktiviert</td></tr>
+      </tbody>
+    </table>
+    <p>Reparatur passiert <strong>automatisch beim Reisen</strong> (Warp 1 ≈ 1 Reparaturpunkt pro System und Tag) oder schneller beim Andocken an einer Basis.</p>
+
+    <!-- ZEITLIMIT -->
+    <h2 id="zeitlimit">Zeitlimit</h2>
+    <p>Die Uhr tickt. Jede NAV-Bewegung kostet mindestens 1 Stardate. Reparaturen kosten ebenfalls Zeit.<br>
+    Läuft die Zeit ab, hat die Föderation verloren.</p>
+
+    <!-- STRATEGIE -->
+    <h2 id="strategie">Schnellstart-Strategie</h2>
+    <div class="strategy">
+      <ol>
+        <li><code>SRS</code> – orientieren, Klingonen und Romulaner suchen</li>
+        <li><code>LRS</code> – Nachbarquadranten erkunden, Feinde markieren</li>
+        <li><code>NAV</code> – in einen Quadrant mit Feinden fliegen</li>
+        <li><code>SHE</code> – Schilde auf mindestens 300–500 setzen</li>
+        <li><code>TAC</code> – falls Romulaner im LRS aber nicht auf SRS sichtbar</li>
+        <li><code>COM 2</code> – Torpedokurs berechnen lassen</li>
+        <li><code>TOR</code> / <code>PHA</code> – Feinde eliminieren</li>
+        <li><code>TRB</code> – bei Tribble-Befall + Klingonen im Quadrant ausnutzen</li>
+        <li><strong>Basis aufsuchen</strong> wenn Energie &lt; 1000</li>
+      </ol>
+    </div>
+
+    <hr>
+
+    <footer style="border:none; text-align:left; padding:0; margin-top:10px;">
+      <em>Basiert auf dem BASIC-Original von Mike Mayfield (1978). Portierungskette: BASIC → Lua (Emanuele Bolognesi, 2020) → Python → HTML5/JavaScript (2026).</em>
+    </footer>
+
+  </main>
+</div>
+
+<footer>
+  <a href="superstartrek.html">&#x25BA; Zum Spiel</a>
+  &nbsp;&nbsp;&#x2551;&nbsp;&nbsp;
+  <a href="https://github.com/joergsf4/superstartrekplus" target="_blank" rel="noopener">GitHub</a>
+  &nbsp;&nbsp;&#x2551;&nbsp;&nbsp;
+  Super Star Trek HTML5/JS Port 2026
+</footer>
+
+</body>
+</html>
