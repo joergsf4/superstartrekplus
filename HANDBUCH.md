@@ -6,10 +6,11 @@
 
 ## Starten
 
-```
-python superstartrek.py
-```
-oder Doppelklick auf `run.bat`.
+`superstartrek.html` im Browser öffnen – kein Server, keine Installation nötig.
+
+Einfach die Datei doppelklicken oder per Drag & Drop in Chrome/Firefox/Edge ziehen.
+
+> Die Python-Ursprungsversion liegt unter `legacy/superstartrek.py` (nur als Referenz).
 
 ---
 
@@ -455,4 +456,4 @@ Läuft die Zeit ab, hat die Föderation verloren.
 
 ---
 
-*Basiert auf dem BASIC-Original von Mike Mayfield (1978). Python-Port 2026 bzw. dem LUA Port von Emanuele Bolognesi, 2020.
+*Basiert auf dem BASIC-Original von Mike Mayfield (1978). Portierungskette: BASIC → Lua (Emanuele Bolognesi, 2020) → Python → HTML5/JavaScript (2026).*
