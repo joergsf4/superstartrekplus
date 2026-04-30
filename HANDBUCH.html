@@ -324,8 +324,8 @@
       <li class="section"><a href="#romulaner">Romulaner</a></li>
       <li class="section"><a href="#ereignisse">Zufallsereignisse</a></li>
       <li class="section"><a href="#energie">Energie</a></li>
-      <li class="section"><a href="#schaden">Schaden</a></li>
-      <li class="section"><a href="#zeitlimit">Zeitlimit</a></li>
+      <li class="section"><a href="#schaden">Schaden &amp; Reparatur</a></li>
+      <li class="section"><a href="#zeitrunden">Zeit &amp; Runden</a></li>
       <li class="section"><a href="#strategie">Schnellstart</a></li>
     </ul>
   </nav>
@@ -336,6 +336,27 @@
     <div class="intro-box">
       Du übernimmst das Kommando über die USS Enterprise NCC-1701. Irgendwo da draußen lauern Klingonen. Viel Glück, Captain.
     </div>
+
+    <!-- TL;DR -->
+    <h2 id="tldr">TL;DR – In 2 Minuten spielbereit</h2>
+    <p><strong>Ziel:</strong> Alle Klingonen und Romulaner vernichten, bevor das Sterndatum-Limit abläuft.</p>
+    <div class="strategy">
+      <ol>
+        <li><code>SRS</code> – siehst du <code class="sym-kling">+K+</code> oder <code class="sym-rom">{R}</code>? Dann kämpfen. Sonst weiter.</li>
+        <li><code>LRS</code> – schau, wo Feinde sind (erste Ziffer = Klingonen). Fliege dorthin.</li>
+        <li><code>NAV</code> – Kurs (1–8, Himmelsrichtung) und Warpfaktor (1 = ein Quadrant) eingeben.</li>
+        <li><code>SHE</code> – vor dem Kampf Schilde hochsetzen, z. B. <code>500</code>.</li>
+        <li><code>PHA</code> – Phaser auf Feinde feuern, Energiemenge angeben (z. B. <code>800</code>).</li>
+        <li><code>TOR</code> – Torpedo abfeuern (Kurs 1–9). Trifft sofort, kostet keine Energie.</li>
+        <li>Nach dem Kampf: <code>NAV</code> zum nächsten Feind. Energie niedrig? Basis (<code class="sym-base">&gt;!&lt;</code>) ansteuern.</li>
+      </ol>
+    </div>
+    <blockquote>
+      <strong>Faustregeln:</strong> Schilde immer auf 300–500. <code>LRS</code> nach jedem Quadrantenwechsel. Basis ansteuern bei Energie &lt; 1000.
+      Beschädigtes System? <code>REP</code> repariert es sofort – kostet Energie und löst Gegenangriff aus.
+      <strong>Zeit läuft nur beim Fliegen ab</strong> – schießen, scannen, reparieren kostet keine Zeit.
+    </blockquote>
+    <hr>
 
     <!-- STARTEN -->
     <h2 id="starten">Starten</h2>
@@ -372,6 +393,7 @@
       <div class="cmd-card"><div class="cmd-name">TOR</div><div class="cmd-desc">Torpedo feuern</div></div>
       <div class="cmd-card"><div class="cmd-name">SHE</div><div class="cmd-desc">Schilde</div></div>
       <div class="cmd-card"><div class="cmd-name">DAM</div><div class="cmd-desc">Schadenskontrolle</div></div>
+      <div class="cmd-card"><div class="cmd-name">REP</div><div class="cmd-desc">Notfallreparatur</div></div>
       <div class="cmd-card"><div class="cmd-name">COM</div><div class="cmd-desc">Bordcomputer</div></div>
       <div class="cmd-card"><div class="cmd-name">TAC</div><div class="cmd-desc">Tachyon-Scan</div></div>
       <div class="cmd-card"><div class="cmd-name">TRB</div><div class="cmd-desc">Tribbles beamen</div></div>
@@ -447,16 +469,41 @@ BERICHT DER DEFLEKTOR-SCHALTSTELLE:
 
     <!-- DAM -->
     <h3 id="dam"><code>DAM</code> – Schadenskontrolle</h3>
-    <p>Zeigt den Zustand aller 8 Bordsysteme. Negative Werte = beschädigt. Beim Andocken an einer Basis kann repariert werden (kostet Stardates).</p>
+    <p>Zeigt den Zustand aller 8 Bordsysteme. Negative Werte = beschädigt, 0.0 = intakt.</p>
     <pre>GERÄT                   REPARATURZUSTAND
 WARPANTRIEB                      0.0
 KURZSTRECKENSENSOREN             0.0
 LANGSTRECKENSENSOREN             0.0
-PHASERSTEUERUNG                  0.0
-TORPEDOROHRE                    -2.4
+PHASER-STEUERUNG                 0.0
+PHOTONENRÖHREN                  -2.4
 SCHADENSKONTROLLE                0.0
 SCHILDSTEUERUNG                  0.0
-BORDCOMPUTER                     0.0</pre>
+BIBLIOTHEKSCOMPUTER              0.0</pre>
+    <p>Beim Andocken an einer Basis können Techniker <strong>alle Schäden auf einmal</strong> beheben – kostet Stardates, keine Energie:</p>
+    <pre>TECHNIKER BEREIT FÜR REPARATURARBEITEN AN IHREM SCHIFF;
+GESCHÄTZTE REPARATURZEIT: 0.3 STERNDATEN
+GENEHMIGEN SIE DEN REPARATURAUFTRAG (J/N)? J
+REPARATUR ABGESCHLOSSEN.</pre>
+
+    <!-- REP -->
+    <h3 id="rep"><code>REP</code> – Notfallreparatur</h3>
+    <p>Repariert ein einzelnes beschädigtes System <strong>sofort, ohne Sternenbase</strong> – kostet aber viel Energie.</p>
+    <p><strong>Energiekosten:</strong> <code>|Schadenswert| × 200</code><br>
+    Schaden −0.6 kostet 120 Energie, Schaden −3.5 kostet 700 Energie.</p>
+    <p>Wenn nicht genug Energie für eine Vollreparatur vorhanden ist, wird eine <strong>Teilreparatur</strong> durchgeführt – die gesamte verfügbare Energie wird eingesetzt.</p>
+    <blockquote><strong>Achtung:</strong> Feinde im Quadrant nutzen die Ablenkung – nach jeder Notfallreparatur greifen Klingonen und Romulaner sofort an!<br>
+    Erfordert funktionierende Schadenskontrolle (Gerät 6). Ist diese selbst beschädigt, ist <code>REP</code> nicht verfügbar.</blockquote>
+    <pre>NOTFALLREPARATUR – ENERGIEKOSTEN PRO SYSTEM:
+NR  GERÄT                   SCHADEN   ENERGIEKOSTEN
+[5] PHOTONENRÖHREN            -0.6         120
+[7] SCHILDSTEUERUNG           -0.98        196
+
+VERFÜGBARE ENERGIE: 1232
+GERÄTENUMMER WÄHLEN (1-8, ENTER = ABBRUCH): 5
+120 ENERGIEEINHEITEN VERBRAUCHT.
+PHOTONENRÖHREN VOLLSTÄNDIG REPARIERT.
+
+FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
 
     <!-- COM -->
     <h3 id="com"><code>COM</code> – Bordcomputer</h3>
@@ -555,27 +602,53 @@ BORDCOMPUTER                     0.0</pre>
     <blockquote>Wenn Energie + Schilde ≤ 10, ist das Spiel verloren – die Enterprise treibt antriebslos.</blockquote>
 
     <!-- SCHADEN -->
-    <h2 id="schaden">Schaden</h2>
-    <p>Systeme können durch Treffer beschädigt werden (negativer Repair-Wert):</p>
+    <h2 id="schaden">Schaden &amp; Reparatur</h2>
+    <p>Systeme können durch Treffer beschädigt werden (negativer Schadenswert):</p>
     <table>
       <thead><tr><th>System</th><th>Effekt bei Schaden</th></tr></thead>
       <tbody>
         <tr><td>Warpantrieb</td><td>Maximalwarp: 0.2</td></tr>
-        <tr><td>Kurzstreckensensoren</td><td>SRS zeigt nichts</td></tr>
+        <tr><td>Kurzstreckensensoren</td><td>SRS-Anzeige leer</td></tr>
         <tr><td>Langstreckensensoren</td><td>LRS nicht nutzbar</td></tr>
-        <tr><td>Phasersteuerung</td><td>nicht feuerfähig</td></tr>
-        <tr><td>Torpedorohre</td><td>keine Torpedos</td></tr>
-        <tr><td>Schadenskontrolle</td><td>DAM-Report nicht verfügbar</td></tr>
-        <tr><td>Schildsteuerung</td><td>keine Schilde einstellbar</td></tr>
-        <tr><td>Bordcomputer</td><td>PHA ungenauer, COM deaktiviert</td></tr>
+        <tr><td>Phaser-Steuerung</td><td>Phaser nicht feuerfähig</td></tr>
+        <tr><td>Photonenröhren</td><td>Torpedos gesperrt</td></tr>
+        <tr><td>Schadenskontrolle</td><td>DAM-Report nicht verfügbar; REP gesperrt</td></tr>
+        <tr><td>Schildsteuerung</td><td>Schilde nicht einstellbar</td></tr>
+        <tr><td>Bibliothekscomputer</td><td>PHA ungenauer, COM deaktiviert</td></tr>
       </tbody>
     </table>
-    <p>Reparatur passiert <strong>automatisch beim Reisen</strong> (Warp 1 ≈ 1 Reparaturpunkt pro System und Tag) oder schneller beim Andocken an einer Basis.</p>
+    <p><strong>Drei Wege zur Reparatur:</strong></p>
+    <ol>
+      <li><strong>Automatisch beim Reisen</strong> – Bei jedem Warpsprung werden alle beschädigten Systeme um den Warpfaktor (mind. 1.0) repariert.</li>
+      <li><strong>Sternenbase (<code>DAM</code>)</strong> – Angedockt können Techniker alle Schäden auf einmal beheben. Kostet Stardates, keine Energie.</li>
+      <li><strong>Notfallreparatur (<code>REP</code>)</strong> – Einzelnes System sofort reparieren, überall. Kostet viel Energie und löst einen Gegenangriff aus.</li>
+    </ol>
 
-    <!-- ZEITLIMIT -->
-    <h2 id="zeitlimit">Zeitlimit</h2>
-    <p>Die Uhr tickt. Jede NAV-Bewegung kostet mindestens 1 Stardate. Reparaturen kosten ebenfalls Zeit.<br>
-    Läuft die Zeit ab, hat die Föderation verloren.</p>
+    <!-- ZEIT & RUNDEN -->
+    <h2 id="zeitrunden">Zeit &amp; Runden</h2>
+    <p>Es gibt <strong>keine festen Runden</strong>. Das Spiel läuft über ein <strong>Sterndatum-Zeitlimit</strong> – nur bestimmte Aktionen verbrauchen Zeit.</p>
+    <h4>Was Zeit kostet (Sterndatum steigt):</h4>
+    <table>
+      <thead><tr><th>Aktion</th><th>Kosten</th></tr></thead>
+      <tbody>
+        <tr><td>NAV innerhalb eines Quadranten</td><td>+Warpfaktor (mind. 1.0)</td></tr>
+        <tr><td>NAV über Quadrantengrenze</td><td>+1.0 zusätzlich</td></tr>
+        <tr><td>DAM-Reparatur an Basis</td><td>+0.1–1.0 je nach Schäden</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Was keine Zeit kostet:</strong> SRS, LRS, PHA, TOR, SHE, REP, COM, TAC, TRB.</p>
+    <h4>Wann Gegner angreifen:</h4>
+    <table>
+      <thead><tr><th>Aktion</th><th>Gegenangriff?</th></tr></thead>
+      <tbody>
+        <tr><td><code>NAV</code> – Bewegen</td><td>Ja – Klingonen repositionieren sich, dann greifen alle an</td></tr>
+        <tr><td><code>PHA</code> – Phaser</td><td>Ja – nach dem Schuss</td></tr>
+        <tr><td><code>TOR</code> – Torpedo</td><td>Ja – nach Einschlag</td></tr>
+        <tr><td><code>REP</code> – Notfallreparatur</td><td>Ja – Feinde nutzen die Ablenkung</td></tr>
+        <tr><td>SRS, LRS, SHE, DAM, COM, TAC, TRB</td><td>Nein</td></tr>
+      </tbody>
+    </table>
+    <blockquote>Du kannst beliebig oft <code>SRS</code>, <code>LRS</code>, <code>SHE</code> oder <code>DAM</code> nutzen, ohne dass Feinde reagieren. Nur Bewegung und Waffeneinsatz (sowie <code>REP</code>) lösen Gegenangriffe aus.</blockquote>
 
     <!-- STRATEGIE -->
     <h2 id="strategie">Schnellstart-Strategie</h2>
@@ -589,7 +662,8 @@ BORDCOMPUTER                     0.0</pre>
         <li><code>COM 2</code> – Torpedokurs berechnen lassen</li>
         <li><code>TOR</code> / <code>PHA</code> – Feinde eliminieren</li>
         <li><code>TRB</code> – bei Tribble-Befall + Klingonen im Quadrant ausnutzen</li>
-        <li><strong>Basis aufsuchen</strong> wenn Energie &lt; 1000</li>
+        <li><code>REP</code> – kritisch beschädigtes System notfallreparieren (z. B. SRS, Phaser)</li>
+        <li><strong>Basis aufsuchen</strong> wenn Energie &lt; 1000 oder viele Systeme beschädigt</li>
       </ol>
     </div>
 

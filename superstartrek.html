@@ -734,6 +734,83 @@ class Game {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // NOTFALLREPARATUR (REP)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async emergencyRepair() {
+    if (this.damageLevel[6] < 0) {
+      await telePrint('SCHADENSKONTROLLE AUSGEFALLEN – NOTFALLREPARATUR NICHT MÖGLICH.');
+      return;
+    }
+
+    // Prüfen ob überhaupt etwas beschädigt ist
+    const damaged = [];
+    for (let i = 1; i <= 8; i++) {
+      if (this.damageLevel[i] < 0) damaged.push(i);
+    }
+    if (damaged.length === 0) {
+      await telePrint('ALLE SYSTEME BETRIEBSBEREIT – KEINE REPARATUR NOTWENDIG.');
+      return;
+    }
+
+    // Beschädigte Systeme mit Energiekosten anzeigen
+    await telePrint('\nNOTFALLREPARATUR – ENERGIEKOSTEN PRO SYSTEM:');
+    await telePrint('NR  GERÄT                   SCHADEN   ENERGIEKOSTEN');
+    for (const i of damaged) {
+      const cost = Math.round(Math.abs(this.damageLevel[i]) * 200);
+      await telePrint(
+        `[${i}] ` +
+        this._formatWithSpaces(Game.DEVICE_NAMES[i], 27) +
+        this._formatWithSpaces(String(this._roundTo(this.damageLevel[i], 2)), 10) +
+        cost
+      );
+    }
+    await telePrint(`\nVERFÜGBARE ENERGIE: ${Math.round(this.energyLevel)}`);
+
+    const input = await ask('GERÄTENUMMER WÄHLEN (1-8, ENTER = ABBRUCH): ');
+    if (input.trim() === '') return;
+    const dev = parseInt(input);
+    if (isNaN(dev) || dev < 1 || dev > 8) {
+      await telePrint('UNGÜLTIGE GERÄTENUMMER.');
+      return;
+    }
+    if (this.damageLevel[dev] >= 0) {
+      await telePrint(`${Game.DEVICE_NAMES[dev]} IST NICHT BESCHÄDIGT.`);
+      return;
+    }
+
+    const fullCost = Math.round(Math.abs(this.damageLevel[dev]) * 200);
+    if (this.energyLevel < 50) {
+      await telePrint('ENERGIERESERVEN ZU GERING FÜR NOTFALLREPARATUR (MINIMUM: 50).');
+      return;
+    }
+
+    if (this.energyLevel >= fullCost) {
+      // Vollständige Reparatur
+      this.energyLevel -= fullCost;
+      this.damageLevel[dev] = 0;
+      await telePrint(`${fullCost} ENERGIEEINHEITEN VERBRAUCHT.`);
+      await telePrint(`${Game.DEVICE_NAMES[dev]} VOLLSTÄNDIG REPARIERT.`);
+    } else {
+      // Teilreparatur mit verfügbarer Energie
+      const available = Math.floor(this.energyLevel);
+      const repairAmount = available / 200;
+      this.damageLevel[dev] += repairAmount;
+      if (this.damageLevel[dev] > -0.1) this.damageLevel[dev] = -0.1; // Restschaden
+      this.energyLevel = 0;
+      await telePrint(`ENERGIERESERVEN ERSCHÖPFT (${available} EINHEITEN VERWENDET).`);
+      await telePrint(`${Game.DEVICE_NAMES[dev]} TEILWEISE REPARIERT (SCHADEN: ${this._roundTo(this.damageLevel[dev], 2)}).`);
+    }
+
+    // Reparaturarbeiten im Kampf: Gegner nutzen die Ablenkung zum Angriff
+    if (this.k3 > 0 || this.r3 > 0) {
+      await telePrint('\nFEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!');
+      await this._klingonsAttack();
+      await this._romulansAttack();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // BORDCOMPUTER (COM) + Untermenüs
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1750,12 +1827,13 @@ NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
         else if (cmd === 'TOR') await this.firePhotonTorpedoes();
         else if (cmd === 'SHE') await this.shieldControl();
         else if (cmd === 'DAM') await this.damageControl();
+        else if (cmd === 'REP') await this.emergencyRepair();
         else if (cmd === 'COM') await this.libraryComputer();
         else if (cmd === 'TAC') await this.tachyonScan();
         else if (cmd === 'TRB') await this.beamTribbles();
         else if (cmd === 'XXX' || cmd === 'EXIT') { this.gameOver = true; }
         else {
-          await telePrint('BEFEHLE:  NAV  SRS  LRS  PHA  TOR  SHE  DAM  COM  TAC  TRB  XXX');
+          await telePrint('BEFEHLE:  NAV  SRS  LRS  PHA  TOR  SHE  DAM  REP  COM  TAC  TRB  XXX');
         }
 
         // Bildschirm automatisch mit SRS neu zeichnen wenn nicht bereits geschehen
