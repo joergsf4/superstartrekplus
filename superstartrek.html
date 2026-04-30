@@ -321,7 +321,10 @@ class Game {
     this.harryMuddQuadrant  = [0, 0];
     this.vulcanShipQuadrant = [0, 0];
     this.traderQuadrant     = [0, 0];
+    this.ponFarrQuadrant    = [0, 0];
     this.tribblesInfested   = false;
+    this.scottyCaptured     = false;
+    this.scottyCapturedInQuadrant = [0, 0];
 
     // Quadrant display string: 8×8 cells × 3 chars = 192 chars
     this.quadString = ' '.repeat(192);
@@ -539,7 +542,8 @@ class Game {
     this.harryMuddQuadrant = hmQ; taken.push(hmQ);
     const vsQ = this._randomUniqueQuadrant(taken);
     this.vulcanShipQuadrant = vsQ; taken.push(vsQ);
-    this.traderQuadrant = this._randomUniqueQuadrant(taken);
+    this.traderQuadrant = this._randomUniqueQuadrant(taken); taken.push(this.traderQuadrant);
+    this.ponFarrQuadrant = this._randomUniqueQuadrant(taken);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -720,7 +724,11 @@ class Game {
 
       await telePrint('');
       timeToRepair = this._roundTo(timeToRepair + Math.random() * 0.5, 2);
-      if (timeToRepair > 0.9) timeToRepair = 0.9;
+      if (this.scottyCaptured) {
+        timeToRepair = this._roundTo(timeToRepair * 1.3, 2);
+        await telePrint("WARNUNG: OHNE MR. SCOTT DAUERN REPARATUREN 30% LÄNGER.");
+      }
+      if (timeToRepair > 1.2) timeToRepair = 1.2;
       await telePrint('TECHNIKER BEREIT FÜR REPARATURARBEITEN AN IHREM SCHIFF;');
       await telePrint(`GESCHÄTZTE REPARATURZEIT: ${timeToRepair} STERNDATEN`);
       const ans = await ask('GENEHMIGEN SIE DEN REPARATURAUFTRAG (J/N)? ');
@@ -754,10 +762,12 @@ class Game {
     }
 
     // Beschädigte Systeme mit Energiekosten anzeigen
+    const listFactor = this.scottyCaptured ? 2 : 1;
     await telePrint('\nNOTFALLREPARATUR – ENERGIEKOSTEN PRO SYSTEM:');
+    if (this.scottyCaptured) await telePrint('(SCOTTY FEHLT – DOPPELTE KOSTEN!)');
     await telePrint('NR  GERÄT                   SCHADEN   ENERGIEKOSTEN');
     for (const i of damaged) {
-      const cost = Math.round(Math.abs(this.damageLevel[i]) * 200);
+      const cost = Math.round(Math.abs(this.damageLevel[i]) * 200 * listFactor);
       await telePrint(
         `[${i}] ` +
         this._formatWithSpaces(Game.DEVICE_NAMES[i], 27) +
@@ -779,7 +789,11 @@ class Game {
       return;
     }
 
-    const fullCost = Math.round(Math.abs(this.damageLevel[dev]) * 200);
+    const costFactor = this.scottyCaptured ? 2 : 1;
+    const fullCost = Math.round(Math.abs(this.damageLevel[dev]) * 200 * costFactor);
+    if (this.scottyCaptured) {
+      await telePrint("WARNUNG: OHNE MR. SCOTT SIND DIE REPARATURKOSTEN DOPPELT SO HOCH.");
+    }
     if (this.energyLevel < 50) {
       await telePrint('ENERGIERESERVEN ZU GERING FÜR NOTFALLREPARATUR (MINIMUM: 50).');
       return;
@@ -1400,6 +1414,7 @@ class Game {
         this.k[i][2] = 0;
         this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
         this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        if (this.k3 === 0) await this._checkScottyRescue();
       }
     }
 
@@ -1480,6 +1495,7 @@ class Game {
         this._addElementInQuadrantString('   ', x, y);
         this.galaxy[this.q1][this.q2] = this.k3*1000 + this.r3*100 + this.b3*10 + this.s3;
         this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        if (this.k3 === 0) await this._checkScottyRescue();
         done = true;
       } else if (this._searchStringInQuadrant('{R}', x, y)) {
         beep(660,120); beep(880,200);
@@ -1579,6 +1595,7 @@ class Game {
     this.tribblesInfested = false;
     await telePrint('ENTERPRISE IST JETZT TRIBBLE-FREI!');
     if (this._checkAllEnemiesDefeated()) return true;
+    await this._checkScottyRescue();
     await this.shortRangeSensorScan();
     return true;
   }
@@ -1643,6 +1660,78 @@ class Game {
       await telePrint('');
       await sleep(1200);
     }
+
+    if (this.ponFarrQuadrant[0] === this.q1 && this.ponFarrQuadrant[1] === this.q2) {
+      this.ponFarrQuadrant = [0, 0];
+      beep(220, 300); beep(180, 400);
+      await telePrint('\n*** DR. McCOY MELDET SICH AUF DEM KOMM-KANAL ***');
+      await telePrint("'CAPTAIN, ICH MUSS IHNEN ETWAS MITTEILEN... ES BETRIFFT MR. SPOCK.'");
+      await telePrint("'ER BEFINDET SICH IM PON FARR. ICH HABE IHN IN DEN MANNSCHAFTSQUARTIEREN");
+      await telePrint(" EINGESCHLOSSEN, ABER... CAPTAIN, ER HAT VORHER NOCH SCHNELL DEN");
+      await telePrint(" BIBLIOTHEKSCOMPUTER AUF VULKANISCHE LYRIK UMGESTELLT.'");
+      await telePrint('DER BIBLIOTHEKSCOMPUTER IST FÜR CA. 3 STERNDATEN NICHT VERFÜGBAR.');
+      if (this.damageLevel[8] < -3.0) {
+        await telePrint('(SYSTEM WAR BEREITS BESCHÄDIGT – SCHADEN NICHT VERSCHLIMMERT.)');
+      } else {
+        this.damageLevel[8] = -3.0;
+      }
+      await telePrint('');
+      await sleep(1500);
+    }
+
+    // Scotty-Entführung: 15% Chance wenn Klingonen im Quadrant und Scotty noch frei
+    if (this.k3 > 0 && !this.scottyCaptured && Math.random() < 0.15) {
+      // Ersten aktiven Klingonen finden
+      let victim = -1;
+      for (let i = 1; i <= 3; i++) {
+        if (this.k[i] && this.k[i][2] > 0) { victim = i; break; }
+      }
+      if (victim >= 0) {
+        this.scottyCaptured = true;
+        this.scottyCapturedInQuadrant = [this.q1, this.q2];
+        // Klingonenschiff entfernen und als besiegt werten
+        this._addElementInQuadrantString('   ', this.k[victim][0], this.k[victim][1]);
+        this.k[victim][2] = 0;
+        this.k3--;
+        this.totalKlingonShips--;
+        this.galaxy[this.q1][this.q2] = this.k3 * 1000 + this.r3 * 100 + this.b3 * 10 + this.s3;
+        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        this.shipCondition = this._checkShipStatus();
+        beep(400, 100); beep(300, 150); beep(200, 300);
+        await telePrint('\n*** NOTFALL AUF DEM TRANSPORTER! ***');
+        await telePrint("SCOTTY: 'CAPTAIN! DIE KLINGONEN HABEN MEINEN TRANSPORTER ÜBERNOMMEN –");
+        await telePrint("         ICH WERDE HINÜBERGEBEA...'  *VERBINDUNG UNTERBROCHEN*");
+        await telePrint('DER KLINGONISCHE KAMPFKREUZER HAT DEN QUADRANTEN VERLASSEN.');
+        await telePrint("UHURA: 'CAPTAIN, WIR HABEN KEINE TRANSPORTER-KONTROLLE MEHR.");
+        await telePrint("        MR. SCOTT IST AUF DEM KLINGONISCHEN SCHIFF GEFANGEN.'");
+        await telePrint('\nAUSWIRKUNGEN SOLANGE SCOTTY FEHLT:');
+        await telePrint('  – REPARATUREN AN DER BASIS DAUERN 30% LÄNGER');
+        await telePrint('  – NOTFALLREPARATUREN KOSTEN DOPPELTE ENERGIE');
+        await telePrint('\nBEFREIUNG: LETZTES KLINGONENSCHIFF IN EINEM ANDEREN QUADRANTEN VERNICHTEN.');
+        await telePrint('');
+        await sleep(2000);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCOTTY-BEFREIUNG
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async _checkScottyRescue() {
+    if (!this.scottyCaptured) return;
+    // Muss in einem anderen Quadranten sein als dem, in dem Scotty entführt wurde
+    if (this.q1 === this.scottyCapturedInQuadrant[0] && this.q2 === this.scottyCapturedInQuadrant[1]) return;
+    this.scottyCaptured = false;
+    this.scottyCapturedInQuadrant = [0, 0];
+    beep(880, 100); beep(1100, 100); beep(1320, 200);
+    await telePrint('\n*** TRANSPORTER-SIGNAL EMPFANGEN! ***');
+    await telePrint("SCOTTY: 'GOTT SEI DANK, CAPTAIN! DIE KLINGONEN WAREN SO ABGELENKT,");
+    await telePrint("         DASS ICH MICH SELBST ZURÜCKBEAMEN KONNTE. ICH BIN WIEDER AN BORD!'");
+    await telePrint("McCOY:  'Willkommen zurück, du verrückter Schotte.'");
+    await telePrint('ALLE REPARATURKOSTEN WIEDER AUF NORMALEM NIVEAU.');
+    await telePrint('');
+    await sleep(1500);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
