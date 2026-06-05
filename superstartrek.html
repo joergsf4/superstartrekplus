@@ -21,9 +21,9 @@ body {
 #wrap {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  flex: 1;
+  min-height: 0;
   padding: 8px;
-  gap: 0;
 }
 
 #bridge {
@@ -31,7 +31,9 @@ body {
   white-space: pre;
   line-height: 1.4;
   padding: 0 2px 4px;
-  border-bottom: 1px solid #003300;
+  border-bottom: 1px solid #005500;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
   overflow-x: auto;
 }
 
@@ -41,8 +43,11 @@ body {
 
 #terminal {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
   line-height: 1.45;
   padding: 4px 2px 2px;
 }
@@ -98,6 +103,22 @@ body {
 .m-win  { color: #44ff44; font-weight: bold; }
 .m-atk  { color: #ff5050; }
 .m-rom  { color: #ff66ff; }
+
+/* Hauptschirm – Enterprise-Ansicht */
+.ent-title  { color: #88ccff; font-weight: bold; }
+.ent-hull   { color: #00cc44; }
+.ent-shield { color: #40ddff; text-shadow: 0 0 5px #1597c4; }
+.ent-dmg    { color: #ff3030; font-weight: bold; text-shadow: 0 0 5px #b00000; }
+.ent-ok     { color: #44ff44; }
+.ent-off    { color: #557766; }
+/* Status-LED: exakt eine Monospace-Zelle breit, Kreis via ::before */
+.ent-led { display: inline-block; width: 1ch; text-align: center; }
+.ent-led::before {
+  content: ''; display: inline-block;
+  width: 0.62em; height: 0.62em; border-radius: 50%;
+  background: currentColor; vertical-align: middle;
+  box-shadow: 0 0 4px currentColor;
+}
 
 .restart-btn {
   display: inline-block;
@@ -568,11 +589,8 @@ class Game {
 
   async shortRangeSensorScan() {
     this._srsShown = true;  // signal to main loop that SRS was handled
-    if (this.damageLevel[2] < 0) {
-      await telePrint('*** KURZSTRECKENSENSOREN AUSGEFALLEN ***');
-      $bridge.innerHTML = '';
-      return false;
-    }
+    const srsOk = this.damageLevel[2] >= 0;
+    if (!srsOk) await telePrint('*** KURZSTRECKENSENSOREN AUSGEFALLEN ***');
 
     // 8 Zeilen × 8 Zellen × (3 Zeichen + 1 Leerzeichen) = 32 Zeichen
     const grid = [];
@@ -584,9 +602,8 @@ class Game {
     }
 
     const cond  = this.shipCondition;
-    const VS_W  = 33;   // Viewscreen-Innenbreite
+    const VS_W  = 34;   // Viewscreen-Innenbreite (2 für Zeilennummer + 32 Gitter)
     const ST_W  = 23;   // Statusspaltenbreite (mind. 23 für "ROTER ALARM")
-    const PAD_R = 70 - 2 - VS_W - 1 - 2 - ST_W; // = 9
 
     const st = [
       `STERNDATUM  ${this._roundTo(this.stardate, 1)}`,
@@ -599,34 +616,176 @@ class Game {
       `KLINGONEN   ${Math.floor(this.totalKlingonShips)}`,
     ];
 
-    const H = '\u2550', V = '\u2551',
-          TL = '\u2554', TR = '\u2557', BL = '\u255a', BR = '\u255d';
+    const H = '═', V = '║',
+          TL = '╔', TR = '╗', BL = '╚', BR = '╝';
 
-    const outerTop  = TL + H.repeat(70) + TR;
-    const outerBot  = BL + H.repeat(70) + BR;
-    const vsTop     = ' ' + TL + H.repeat(VS_W) + TR + ' '.repeat(70 - VS_W - 3);
-    const vsBot     = ' ' + BL + H.repeat(VS_W) + BR + ' '.repeat(70 - VS_W - 3);
-    const bridgeCrew = [
-      ' '.repeat(70),
-      '   \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557    \u2554\u2550\u2550\u2550\u2557'.padEnd(70),
-      '   \u2551CHK\u2551    \u2551SLU\u2551    \u2551   KIRK   \u2551    \u2551UHR\u2551    \u2551SPK\u2551'.padEnd(70),
-      ' \u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2550\u2569\u2550\u2550\u2550\u2569\u2550\u2550'.padEnd(70),
-    ];
-
-    const rawLines = [outerTop, V + vsTop + V];
-    for (let i = 0; i < 8; i++) {
-      const vsContent = ' ' + grid[i];
-      const stPadded  = this._formatWithSpaces(st[i], ST_W);
-      const content   = ' ' + V + vsContent + V + '  ' + stPadded + ' '.repeat(PAD_R);
-      rawLines.push(V + content + V);
+    // ── Spalte 1: Kurzstrecken-Viewscreen (Karte) ──
+    const WMAP = 1 + 1 + VS_W + 1;   // Leerzeichen + ║ + Viewscreen + ║
+    const panelMap = [{ vis: ' ' + TL + H.repeat(VS_W) + TR }];
+    if (srsOk) {
+      // Beschriftete Karte: Spaltenkopf 1–8 + 8 Gitterzeilen mit Zeilennummer
+      const colHeaderArr = Array(VS_W).fill(' ');
+      for (let j = 0; j < 8; j++) colHeaderArr[4 * j + 3] = String(j + 1);
+      const vsInner = [colHeaderArr.join('')];
+      for (let i = 0; i < 8; i++) vsInner.push((i + 1) + ' ' + grid[i]);
+      for (const line of vsInner) panelMap.push({ vis: ' ' + V + line + V });
+    } else {
+      // Sensoren ausgefallen: nur diese Karte ausblenden, restliche Brücke bleibt
+      for (let r = 0; r < 9; r++) {
+        const s  = r === 3 ? 'KURZSTRECKENSENSOREN' : r === 5 ? 'AUSGEFALLEN' : '';
+        const lp = Math.floor((VS_W - s.length) / 2), rp = VS_W - lp - s.length;
+        panelMap.push(s
+          ? { vis:  ' ' + V + ' '.repeat(lp) + s + ' '.repeat(rp) + V,
+              html: ' ' + V + ' '.repeat(lp) + `<span class="c-red">${s}</span>` + ' '.repeat(rp) + V }
+          : { vis:  ' ' + V + ' '.repeat(VS_W) + V });
+      }
     }
-    rawLines.push(V + vsBot + V);
-    for (const bl of bridgeCrew) rawLines.push(V + bl + V);
-    rawLines.push(outerBot);
+    panelMap.push({ vis: ' ' + BL + H.repeat(VS_W) + BR });
+
+    // ── Spalte 2: Statuswerte ──
+    const WSTAT = ST_W;
+    const panelStat = st.map(s => ({ vis: this._formatWithSpaces(s, ST_W) }));
+
+    // ── Spalte 3: schematische Enterprise rechts neben dem Schirm ──
+    const ship  = this._enterpriseSchematic();
+    const WSHIP = ship.width;
+
+    // Gesamt-Innenbreite der Brücken-Box aus den drei Spalten
+    const GAP   = 3;
+    const INNER = WMAP + GAP + WSTAT + GAP + WSHIP + 1;  // +1 = rechter Rand
+
+    // Senkrechte Ausrichtung: Status ab erster Gitterzeile, Schiff oben bündig
+    const STAT_OFFSET = 2;
+    const N = Math.max(panelMap.length, STAT_OFFSET + panelStat.length, ship.lines.length);
+
+    const blank    = (w) => ' '.repeat(w);
+    const cellHtml = (panel, w) =>
+      !panel ? blank(w) : (panel.html != null ? panel.html : colorMsg(safeHtml(panel.vis)));
+
+    const gap = blank(GAP);
+    const htmlLines = [colorMsg(safeHtml(TL + H.repeat(INNER) + TR))];
+    for (let i = 0; i < N; i++) {
+      const html =
+        cellHtml(panelMap[i], WMAP) + gap +
+        cellHtml(panelStat[i - STAT_OFFSET], WSTAT) + gap +
+        cellHtml(ship.lines[i], WSHIP);
+      htmlLines.push(V + html + ' ' + V);
+    }
+
+    // ── Brückencrew zentriert unter den Spalten ──
+    const crew = [
+      '╔═══╗    ╔═══╗    ╔══════════╗    ╔═══╗    ╔═══╗',
+      '║CHK║    ║SLU║    ║   KIRK   ║    ║UHR║    ║SPK║',
+    ];
+    htmlLines.push(V + blank(INNER) + V);
+    for (const c of crew) {
+      const lp = Math.floor((INNER - c.length) / 2);
+      htmlLines.push(V + colorMsg(safeHtml(blank(lp) + c + blank(INNER - lp - c.length))) + V);
+    }
+    htmlLines.push(colorMsg(safeHtml(BL + H.repeat(INNER) + BR)));
 
     // Render in-place into the fixed bridge HUD
-    $bridge.innerHTML = rawLines.map(line => colorMsg(safeHtml(line))).join('\n');
-    return true;
+    $bridge.innerHTML = htmlLines.join('\n');
+    return srsOk;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HAUPTSCHIRM – schematische Enterprise (Schilde + Systemschäden)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Liefert die schematische Enterprise als Spalte gleich breiter Zeilen
+   * ({ lines: [{vis, html}], width }) zur Platzierung rechts neben dem Schirm.
+   *  - Warpgondeln werden rot, wenn der Warpantrieb (Gerät 1) beschädigt ist.
+   *  - Bei aktiven Schilden (shieldLevel > 0) leuchtet der Schiffsrumpf cyan.
+   *  - Zwei Zeilen zeigen die Gerätenamen grün (OK) bzw. rot (beschädigt).
+   */
+  _enterpriseSchematic() {
+    const warpDmg   = this.damageLevel[1] < 0;
+    const shieldDmg = this.damageLevel[7] < 0;
+    const shieldsUp = this.shieldLevel > 0 && !shieldDmg;
+
+    // Front-/Draufsicht der Enterprise (links Warpgondeln, rechts Untertasse)
+    const art = [
+      '    _________________       .-------.',
+      '   |________________|)   .-\'         `-.',
+      '                ||      /               \\',
+      '                ||     /                 \\',
+      '             ___||_,--|       _.--,       |',
+      '            |_________|______/_.-. |      |',
+      '            |______   |      \\_`-\' |      |',
+      '                || `--|        `--\'       |',
+      '                ||     \\                 /',
+      '    ____________||___   \\               /',
+      '   |________________|)   `-.         .-\'',
+      '                            `-------\'',
+    ];
+    const artW = art.reduce((m, l) => Math.max(m, l.length), 0);
+
+    const nacelleRange = (li) => {
+      if (li === 0 || li === 1 || li === 9 || li === 10) return [0, 21];
+      if (li === 2 || li === 3 || li === 8) return [16, 17];
+      return null;
+    };
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Systemschäden: Gerätename grün = OK, rot = beschädigt
+    const row1 = [['WARP', 1], ['SENSOR', 2], ['PHASER', 4]];
+    const row2 = [['TORPEDO', 5], ['SCHILD', 7], ['COMPUTER', 8]];
+    const ISEP = '   ';
+    // 'o' im vis-Text = Platzhalter für die LED-Bubble (genau eine Zelle breit)
+    const indVis  = (row) => row.map(([n]) => n + ' o').join(ISEP);
+    const indHtml = (row) => row.map(([n, d]) => {
+      const cls = this.damageLevel[d] < 0 ? 'ent-dmg' : 'ent-ok';
+      return `<span class="${cls}">${esc(n)}</span> <span class="ent-led ${cls}"></span>`;
+    }).join(ISEP);
+
+    const title = 'HAUPTSCHIRM';
+    const slVis = shieldsUp ? 'SCHILDE: AKTIV' : 'SCHILDE: INAKTIV';
+    const width = Math.max(artW, title.length, slVis.length, indVis(row1).length, indVis(row2).length);
+
+    const pad = (n) => ' '.repeat(Math.max(0, n));
+    const center = (vis, html) => {
+      const lp = Math.floor((width - vis.length) / 2);
+      const rp = width - lp - vis.length;
+      return { vis: pad(lp) + vis + pad(rp), html: pad(lp) + html + pad(rp) };
+    };
+
+    const lines = [];
+    lines.push(center(title, `<span class="ent-title">${esc(title)}</span>`));
+
+    // Schiffsgrafik – Färbung nach Priorität: Warpschaden > Schild-Glow > Rumpf
+    for (let li = 0; li < art.length; li++) {
+      const line = art[li].padEnd(artW, ' ');
+      const rg = nacelleRange(li);
+      let html = '', run = '', runCls = '';
+      const flush = () => {
+        if (!run) return;
+        html += runCls === null ? esc(run) : `<span class="${runCls}">${esc(run)}</span>`;
+        run = '';
+      };
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        let cls;
+        if (ch === ' ') cls = null;
+        else {
+          const isNac = rg && ci >= rg[0] && ci <= rg[1];
+          if (isNac && warpDmg) cls = 'ent-dmg';
+          else if (shieldsUp)   cls = 'ent-shield';
+          else                  cls = 'ent-hull';
+        }
+        if (cls !== runCls) { flush(); runCls = cls; }
+        run += ch;
+      }
+      flush();
+      lines.push(center(line, html));
+    }
+
+    lines.push(center(slVis, `<span class="${shieldsUp ? 'ent-shield' : 'ent-off'}">${esc(slVis)}</span>`));
+    lines.push(center(indVis(row1), indHtml(row1)));
+    lines.push(center(indVis(row2), indHtml(row2)));
+
+    return { lines, width };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
