@@ -729,10 +729,10 @@ class Game {
     };
     const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    // Systemschäden: Gerätename grün = OK, rot = beschädigt
-    const row1 = [['WARP', 1], ['SENSOR', 2], ['PHASER', 4]];
-    const row2 = [['TORPEDO', 5], ['SCHILD', 7], ['COMPUTER', 8]];
-    const ISEP = '   ';
+    // Systemschäden: Gerätename grün = OK, rot = beschädigt (alle 8 Geräte)
+    const row1 = [['WARP', 1], ['SRS', 2], ['LRS', 3], ['PHASER', 4]];
+    const row2 = [['TORPEDO', 5], ['REP', 6], ['SCHILD', 7], ['COMPUTER', 8]];
+    const ISEP = '  ';
     // 'o' im vis-Text = Platzhalter für die LED-Bubble (genau eine Zelle breit)
     const indVis  = (row) => row.map(([n]) => n + ' o').join(ISEP);
     const indHtml = (row) => row.map(([n, d]) => {
@@ -740,9 +740,8 @@ class Game {
       return `<span class="${cls}">${esc(n)}</span> <span class="ent-led ${cls}"></span>`;
     }).join(ISEP);
 
-    const title = 'HAUPTSCHIRM';
     const slVis = shieldsUp ? 'SCHILDE: AKTIV' : 'SCHILDE: INAKTIV';
-    const width = Math.max(artW, title.length, slVis.length, indVis(row1).length, indVis(row2).length);
+    const width = Math.max(artW, slVis.length, indVis(row1).length, indVis(row2).length);
 
     const pad = (n) => ' '.repeat(Math.max(0, n));
     const center = (vis, html) => {
@@ -752,7 +751,6 @@ class Game {
     };
 
     const lines = [];
-    lines.push(center(title, `<span class="ent-title">${esc(title)}</span>`));
 
     // Schiffsgrafik – Färbung nach Priorität: Warpschaden > Schild-Glow > Rumpf
     for (let li = 0; li < art.length; li++) {
