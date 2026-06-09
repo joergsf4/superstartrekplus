@@ -346,6 +346,9 @@ class Game {
     this.tribblesInfested   = false;
     this.scottyCaptured     = false;
     this.scottyCapturedInQuadrant = [0, 0];
+    this.khanQuadrant       = [0, 0];    // Ort des Space-Seed-Events (Khan)
+    this.khanInControl      = false;     // Khan hat Teilkontrolle über das Schiff
+    this.khanJumpsRemaining = 0;         // Countdown bis zum Aussetzen der Botany-Bay-Crew
 
     // Quadrant display string: 8×8 cells × 3 chars = 192 chars
     this.quadString = ' '.repeat(192);
@@ -564,7 +567,8 @@ class Game {
     const vsQ = this._randomUniqueQuadrant(taken);
     this.vulcanShipQuadrant = vsQ; taken.push(vsQ);
     this.traderQuadrant = this._randomUniqueQuadrant(taken); taken.push(this.traderQuadrant);
-    this.ponFarrQuadrant = this._randomUniqueQuadrant(taken);
+    this.ponFarrQuadrant = this._randomUniqueQuadrant(taken); taken.push(this.ponFarrQuadrant);
+    this.khanQuadrant = this._randomUniqueQuadrant(taken);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1762,6 +1766,78 @@ class Game {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async _checkSpecialEvents() {
+    // ── Space Seed: Khan hat die Teilkontrolle (anhaltender Zustand) ──────────
+    // Läuft auf JEDEM Quadrantenwechsel solange Khan an Bord ist. Steht VOR dem
+    // Auslöse-Block, damit der Entdeckungs-Sprung selbst keinen Countdown verbraucht.
+    if (this.khanInControl) {
+      this.khanJumpsRemaining--;
+      if (this.khanJumpsRemaining <= 0) {
+        // Auflösung: Botany-Bay-Crew auf einem Planeten aussetzen
+        const planet = this._getQuadrantName(this.q1, this.q2, true) + ' V';
+        this.khanInControl = false;
+        beep(330, 150); beep(262, 200);
+        await telePrint('\n*** SHOWDOWN IM MASCHINENRAUM ***');
+        await telePrint('KIRK STELLT KHAN ZWISCHEN DEN WARPGONDELN ZUM ENTSCHEIDENDEN KAMPF.');
+        await telePrint("KHAN: 'SIE WOLLEN GEGEN MICH ANTRETEN, CAPTAIN? ICH BIN IHNEN IN JEDER");
+        await telePrint("       HINSICHT ÜBERLEGEN.'");
+        beep(180, 120); beep(140, 160);
+        await telePrint('KHAN IST KÖRPERLICH WEIT STÄRKER — EIN EINZIGER SEINER SCHLÄGE WIRFT KIRK');
+        await telePrint('QUER DURCH DEN RAUM. DOCH DER CAPTAIN GIBT NICHT AUF. ER WEICHT AUS,');
+        await telePrint('NUTZT JEDE DECKUNG, REISST EINE STREBE AUS DER WANDVERKLEIDUNG —');
+        beep(220, 100); beep(300, 100); beep(160, 250);
+        await telePrint('UND MIT EINEM LETZTEN, VERZWEIFELTEN HIEB GEHT KHAN ZU BODEN. BEWUSSTLOS.');
+        await telePrint('MCCOY: \'Er lebt noch, Jim. Aber er wird eine Weile schlafen.\'');
+        await telePrint(`\nDIE ENTERPRISE FINDET EINEN BEWOHNBAREN PLANETEN: ${planet}.`);
+        await telePrint('KIRK SETZT KHAN UND DIE GESAMTE CREW DER BOTANY BAY DORT AUS — NICHT ALS');
+        await telePrint('GEFANGENE, SONDERN MIT DER CHANCE, EINE EIGENE WELT ZU FORMEN.');
+        await telePrint(`KIRK: 'EIN UNBERÜHRTER PLANET, KHAN. EINE WELT, DIE SIE NACH IHREM WILLEN`);
+        await telePrint("       GESTALTEN KÖNNEN. ICH FRAGE MICH, WAS SIE DARAUS MACHEN WERDEN.'");
+        await telePrint("KHAN: 'ICH HABE EINST GELESEN... ES IST BESSER, IN DER HÖLLE ZU HERRSCHEN");
+        await telePrint("       ALS IM HIMMEL ZU DIENEN.'");
+        await telePrint('DIE EINDRINGLINGE SIND VON BORD. DIE KONTROLLE ÜBER ALLE SYSTEME IST WIEDERHERGESTELLT.\n');
+        await sleep(2200);
+      } else {
+        // Sabotage: zufälliges Gerät beschädigen (Schadenskontrolle Nr. 6 ausnehmen,
+        // damit Reparaturen immer möglich bleiben) + Energie abzapfen
+        const sabotagable = [1, 2, 3, 4, 5, 7, 8];
+        const dev = sabotagable[Math.floor(Math.random() * sabotagable.length)];
+        if (this.damageLevel[dev] >= 0) this.damageLevel[dev] = -(2 + Math.random() * 2);
+        const drained = 150;
+        this.energyLevel = Math.max(0, this.energyLevel - drained);
+        beep(300, 150); beep(240, 200);
+        await telePrint('\n*** KHANS LEUTE SABOTIEREN DAS SCHIFF! ***');
+        await telePrint(`${Game.DEVICE_NAMES[dev]} WURDE MANIPULIERT UND IST AUSGEFALLEN.`);
+        await telePrint(`${drained} ENERGIEEINHEITEN ABGEZAPFT. ENERGIE JETZT BEI ${Math.floor(this.energyLevel)}.\n`);
+        await sleep(1200);
+      }
+    }
+
+    // Space Seed: Khan entdecken (ortsgebunden, einmalig)
+    if (this.khanQuadrant[0] === this.q1 && this.khanQuadrant[1] === this.q2 && !this.khanInControl) {
+      this.khanQuadrant = [0, 0];
+      this.khanInControl = true;
+      this.khanJumpsRemaining = 2 + Math.floor(Math.random() * 7); // 2..8
+      beep(200, 250); beep(160, 300); beep(130, 400);
+      await telePrint('\n*** SENSORKONTAKT — EIN ANTIKES WRACK TREIBT LAUTLOS DURCH DEN QUADRANTEN ***');
+      await telePrint('SPOCK: \'EIN SCHLÄFERSCHIFF AUS DEM 20. JAHRHUNDERT, CAPTAIN. DIE HÜLLE TRÄGT');
+      await telePrint("        DIE KENNUNG »SS BOTANY BAY«. ICH REGISTRIERE SCHWACHE LEBENSZEICHEN —");
+      await telePrint("        DUTZENDE MENSCHEN IN KÄLTESCHLAF, SEIT ÜBER ZWEIHUNDERT JAHREN.'");
+      await telePrint('MCCOY: \'Mein Gott, Jim — die schlafen da seit den Eugenischen Kriegen.\'');
+      await telePrint('SIE LASSEN DIE ÜBERLEBENDEN AN BORD BEAMEN — EIN VERHÄNGNISVOLLER FEHLER.');
+      await telePrint('DER ANFÜHRER ERHEBT SICH AUS DER STASE: KHAN NOONIEN SINGH, EIN GENETISCH');
+      await telePrint('VERBESSERTER TYRANN AUS DER ERDGESCHICHTE — STÄRKER, KLÜGER UND SKRUPELLOSER');
+      await telePrint('ALS JEDER NORMALE MENSCH. BINNEN MINUTEN HAT ER SEINE LEUTE IN DEN');
+      await telePrint('SCHLÜSSELSEKTIONEN DES SCHIFFES POSTIERT.');
+      await telePrint("KHAN: 'EIN BEEINDRUCKENDES SCHIFF, CAPTAIN. ES WIRD MIR GUT DIENEN.");
+      await telePrint("       VON NUN AN GEHORCHT DIE ENTERPRISE MIR.'");
+      await telePrint('\n>> AUSWIRKUNGEN, SOLANGE KHAN AN BORD IST:');
+      await telePrint('   - BEI JEDEM WARPSPRUNG SABOTIEREN SEINE LEUTE EIN SCHIFFSSYSTEM');
+      await telePrint('   - SIE ZAPFEN DABEI 150 ENERGIEEINHEITEN AB');
+      await telePrint('SPOCK: \'KURS HALTEN, CAPTAIN. DIE MANNSCHAFT ARBEITET DARAN, DIE');
+      await telePrint("        EINDRINGLINGE NACH UND NACH ZURÜCKZUDRÄNGEN.'\n");
+      await sleep(2000);
+    }
+
     // Harry Mudd
     if (this.harryMuddQuadrant[0] === this.q1 && this.harryMuddQuadrant[1] === this.q2) {
       this.harryMuddQuadrant = [0, 0];
