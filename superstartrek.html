@@ -791,7 +791,7 @@ async function ask(promptText = '') {
   else $wp.hidden = true;
 
   $cp.hidden = !course;
-  if (course) cpSet(1);
+  if (course) { cpSet(1); cpShowTargets(g); }
   $com.hidden = !com;
   $jn.hidden = !jn;
   document.body.classList.toggle('slider-mode', !!warp || phaser || shields || course);
@@ -878,6 +878,7 @@ $wpCol.addEventListener('pointermove', e => { if (e.buttons) _wpFromEvent(e); })
 // ── Kompassrose: Aufbau + Zeigersteuerung ──
 // Kurssystem: 1 = Osten (rechts), gegen den Uhrzeigersinn ansteigend (3 = Norden …)
 let _cpArrow = null;
+let _cpMarkers = null;
 
 // Wird in der Grafik-Sektion aufgerufen (nach Definition von SVGNS/svgEl)
 function initCompass() {
@@ -900,16 +901,55 @@ function initCompass() {
   svgEl('polygon', {points: `${C + 68},${C} ${C + 48},${C - 9} ${C + 48},${C + 9}`,
                     fill: '#e9a262', filter: 'url(#fglow)'}, _cpArrow);
   svgEl('circle', {cx: C, cy: C, r: 6, fill: '#7fd4ff'}, $cpSvg);
+  // Marker-Ebene zuletzt: liegt über Zeiger/Ticks und fängt Pointer-Events zuerst
+  _cpMarkers = svgEl('g', {}, $cpSvg);
 }
 
-/** Kurs setzen (1–8.5 in halben Schritten); aktualisiert Zeiger + Eingabefeld. */
-function cpSet(c, writeCmd = true) {
-  c = Math.round(Math.min(9, Math.max(1, c)) * 2) / 2;
+/** Kurs setzen; snap=true rastet auf halbe Schritte, snap=false erlaubt exakte Werte (z.B. 5.34). */
+function cpSet(c, writeCmd = true, snap = true) {
+  c = Math.min(9, Math.max(1, c));
+  if (snap) c = Math.round(c * 2) / 2;
   if (c >= 9) c = 1;
+  c = parseFloat(c.toFixed(2));
   _cpArrow.setAttribute('transform', `rotate(${-(c - 1) * 45} 100 100)`);
   $cpVal.textContent = 'KURS ' + c;
   if (writeCmd) $cmd.value = String(c);
   return c;
+}
+
+// ── Ziel-Marker auf der Kompassrose ──
+// Gegner + Sternenbasis im aktuellen Quadranten, jeweils mit exakt dem Kurs,
+// den auch der Bordcomputer ausgibt (RICHTUNG = x.xx). Klick übernimmt den Wert.
+const CP_MARKER_COLOR = {K: '#ff6b5c', R: '#d683b2', B: '#6fd68b'};
+
+function cpTargets(g) {
+  if (!g) return [];
+  const out = [];
+  const add = (row, col, type) => {
+    if (row === g.s1 && col === g.s2) return;
+    out.push({course: g._roundTo(g._calcCourse(row, col, g.s1, g.s2), 2), type});
+  };
+  for (let i = 1; i <= 3; i++) if (g.k[i] && g.k[i][2] > 0) add(g.k[i][0], g.k[i][1], 'K');
+  for (let i = 1; i <= 2; i++) if (g.r[i] && g.r[i][2] > 0 && !g.r[i][3]) add(g.r[i][0], g.r[i][1], 'R');
+  if (g.b3 > 0) add(g.b4, g.b5, 'B');
+  return out;
+}
+
+function cpShowTargets(g) {
+  if (!_cpMarkers) return;
+  _cpMarkers.innerHTML = '';
+  for (const t of cpTargets(g)) {
+    const a = (t.course - 1) * Math.PI / 4;
+    const x = 100 + 66 * Math.cos(a), y = 100 - 66 * Math.sin(a);
+    const m = svgEl('g', {cursor: 'pointer'}, _cpMarkers);
+    svgEl('circle', {cx: x, cy: y, r: 9, fill: '#10141f', stroke: CP_MARKER_COLOR[t.type],
+                     'stroke-width': 2, filter: 'url(#fglow)'}, m);
+    const txt = svgEl('text', {x, y: y + 4, 'text-anchor': 'middle', fill: CP_MARKER_COLOR[t.type],
+                               'font-size': 11, 'font-weight': 700}, m);
+    txt.textContent = t.type;
+    m.addEventListener('pointerdown', e => { e.stopPropagation(); cpSet(t.course, true, false); });
+    m.addEventListener('pointermove', e => e.stopPropagation());
+  }
 }
 
 function _cpFromEvent(e) {
@@ -931,7 +971,7 @@ $cmd.addEventListener('input', () => {
   const v = parseFloat($cmd.value);
   if (isNaN(v)) return;
   if (!$wp.hidden) wpSet(v, false);
-  if (!$cp.hidden) cpSet(v, false);
+  if (!$cp.hidden) cpSet(v, false, false);
 });
 
 function submitInput(val) {
@@ -1453,29 +1493,29 @@ class Game {
     return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
   }
 
-  async _calcAndPrintDirection(m, n, startCourse) {
-    let dir;
+  _calcDirection(m, n, startCourse) {
     if (Math.abs(m) > Math.abs(n)) {
-      dir = startCourse + Math.abs(n) / Math.abs(m);
-    } else {
-      dir = startCourse + (Math.abs(n) - Math.abs(m) + Math.abs(n)) / Math.abs(n);
+      return startCourse + Math.abs(n) / Math.abs(m);
     }
-    await telePrint(` RICHTUNG = ${this._roundTo(dir, 2)}`);
-    return dir;
+    return startCourse + (Math.abs(n) - Math.abs(m) + Math.abs(n)) / Math.abs(n);
   }
 
-  async _printDistanceAndDirection(x1, y1, x2, y2) {
+  /** Kurs (1–9, Fließkomma) von (x2,y2) nach (x1,y1) – Oktanten-Logik des BASIC-Originals. */
+  _calcCourse(x1, y1, x2, y2) {
     const hd = y1 - y2;
     const vd = x2 - x1;
     if (hd < 0) {
-      if (vd > 0)      await this._calcAndPrintDirection(vd, hd, 3);
-      else if (hd !== 0) await this._calcAndPrintDirection(hd, vd, 5);
-    } else {
-      if (vd < 0)       await this._calcAndPrintDirection(vd, hd, 7);
-      else if (hd > 0)  await this._calcAndPrintDirection(hd, vd, 1);
-      else if (vd === 0) await this._calcAndPrintDirection(hd, vd, 5);
-      else              await this._calcAndPrintDirection(hd, vd, 1);
+      if (vd > 0) return this._calcDirection(vd, hd, 3);
+      return this._calcDirection(hd, vd, 5);
     }
+    if (vd < 0)    return this._calcDirection(vd, hd, 7);
+    if (hd > 0)    return this._calcDirection(hd, vd, 1);
+    if (vd === 0)  return this._calcDirection(hd, vd, 5);
+    return this._calcDirection(hd, vd, 1);
+  }
+
+  async _printDistanceAndDirection(x1, y1, x2, y2) {
+    await telePrint(` RICHTUNG = ${this._roundTo(this._calcCourse(x1, y1, x2, y2), 2)}`);
     const dist = this._calcDistance(x1, y1, x2, y2);
     await telePrint(` ENTFERNUNG = ${this._roundTo(dist, 2)}`);
     return dist;
