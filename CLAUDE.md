@@ -7,7 +7,8 @@
 HTML5/JavaScript-Port von **Super Star Trek** (Original BASIC 1978, Mike Mayfield / Dave Ahl).
 Portierungskette: BASIC → Lua (Emanuele Bolognesi, 2020) → Python → **HTML5/JS (2026, führend)**.
 
-Einzige Klasse: `Game` in `superstartrek.html` (~1800 Zeilen Inline-JS).
+Einzige Klasse: `Game` in `superstartrek.html` (~2500 Zeilen Inline-JS).
+GUI: grafische **LCARS-Brücke** (CSS-Grid + Inline-SVG, siehe `GUI-PLAN.md`).
 
 ## Starten
 
@@ -29,6 +30,7 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 |-------|-------|
 | `superstartrek.html` | **Gesamtes Spiel** (HTML + CSS + JS, Single File) |
 | `HANDBUCH.md` | Spielanleitung auf Deutsch |
+| `GUI-PLAN.md` | Konzept + Umsetzungsplan der LCARS-GUI |
 | `CLAUDE.md` | Diese Datei |
 | `legacy/superstartrek.py` | Python-Vorgängerversion (Referenz) |
 | `legacy/_test_events.py` | Python-Ereignistests (Referenz) |
@@ -42,8 +44,15 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 - Quadranten-String: `quadString` = 192 Zeichen (8×8 Sektoren × 3 Zeichen).
 - `galaxy[i][j]` kodiert: `klingons*1000 + romulans*100 + starbases*10 + stars`.
 - I/O über `telePrint()` (schreibt in `#terminal`) und `ask()` (Promise-basiert).
-- Layout: `#bridge` (persistentes HUD, SRS-Karte + Status) + `#terminal` (scrollbares Log) + `#input-row`.
-- Farben: `safeHtml()` (Token → PUA-Escaping → `<span>`) + `colorMsg()` (Nachrichtenklassen).
+- Layout (LCARS-Grid `#lcars`): Kopfzeile (`#top`) + Befehls-Buttons (`#side`) +
+  SVG-Hauptschirm (`#srs` im `#screen-frame`) + Statuspanel (`#stat`) + Terminal (`#term-panel`).
+- **Präsentationsschicht getrennt von der Logik**: `renderBridge(game)` liest den Spielzustand
+  (`quadString`, `energyLevel`, `damageLevel`, `exploredSpace`, …) und rendert Karte + Status.
+  `FX.phaser()/torpedoAt()/boom()/shake()` = Waffen-Animationen auf dem SVG (Hooks in den
+  4 Waffen-/Angriffsmethoden). Sprites als SVG-`<symbol>` (`#sym-ent`, `#sym-kli`, …).
+- Befehls-Buttons senden über `submitInput()` durch das normale `ask()`-Promise;
+  aktiv nur bei `BEFEHL?`-Prompt (Body-Klasse `cmd-mode`).
+- Farben: `safeHtml()` (Token → PUA-Escaping → `<span>`) + `colorMsg()` (Nachrichtenklassen) im Terminal-Log.
 
 ## Wichtige Methoden (Auswahl)
 
@@ -52,7 +61,7 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 | `_initGalaxy()` | Galaxis zufällig befüllen |
 | `_checkSpecialEvents()` | Harry Mudd, Vulkan-Schiff, Händler, Tribbles |
 | `_klingonsAttack()` / `_romulansAttack()` | Angriffe der Gegner |
-| `shortRangeSensorScan()` | SRS → rendert in `#bridge` HUD |
+| `shortRangeSensorScan()` | SRS → ruft `renderBridge()` (grafisches HUD) |
 | `firePhasers()` / `firePhotonTorpedoes()` | Waffen |
 | `courseControl()` / `impulseEngines()` | Bewegung |
 | `tachyonScan()` | Getarnte Romulaner aufspüren |
