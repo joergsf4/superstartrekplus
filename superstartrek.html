@@ -923,7 +923,9 @@ function cpSet(c, writeCmd = true, snap = true) {
 const CP_MARKER_COLOR = {K: '#ff6b5c', R: '#d683b2', B: '#6fd68b'};
 
 function cpTargets(g) {
-  if (!g) return [];
+  // Zielerfassung ist eine Funktion des Bibliothekscomputers (Gerät 8):
+  // ist er beschädigt, gibt es keine berechneten Kurslösungen (Issue #2)
+  if (!g || g.damageLevel[8] < 0) return [];
   const out = [];
   const add = (row, col, type) => {
     if (row === g.s1 && col === g.s2) return;
