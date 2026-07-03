@@ -322,6 +322,25 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
   position: absolute; left: 0; right: 0; bottom: 0; height: 25%;
   background: linear-gradient(180deg, #f7d09a, #e9a262 45%, #a35f22);
 }
+/* Schild-Modus: Säulenrest = Schiffsenergie (orange), Füllung = Schilde (cyan) */
+#warp-panel.mode-schilde #wp-col  { background: linear-gradient(180deg, #7a5226, #4a3115); }
+#warp-panel.mode-schilde #wp-fill { background: linear-gradient(180deg, #9fe8ff, #57d8ff 45%, #1d6f8f); }
+#warp-panel.mode-schilde #wp-value { background: #57d8ff; }
+#warp-panel.mode-schilde #wp-value.warnung { background: #ee4433; color: #fff; }
+
+#wp-presets { display: flex; gap: 4px; }
+#wp-presets[hidden] { display: none; }
+#wp-presets button {
+  flex: 1; border: none; cursor: pointer; padding: 3px 0;
+  border-radius: 9px; background: var(--lc-lilac); color: #000;
+  font-family: inherit; font-weight: 700; font-size: 11px; letter-spacing: 0.5px;
+}
+#wp-presets button:hover { filter: brightness(1.25); }
+
+#wp-rest {
+  text-align: center; font-size: 12px; letter-spacing: 1px;
+  color: var(--lc-gold); padding: 1px 0;
+}
 /* Skalenstriche: kurze Ticks von beiden Rändern (Lineal-Optik wie im Original) */
 #wp-ticks {
   position: absolute; inset: 0; pointer-events: none;
@@ -374,6 +393,43 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
   font-family: inherit; font-weight: 700; font-size: 13px; letter-spacing: 2px;
 }
 .panel-exec:hover { filter: brightness(1.25); }
+
+/* ── Bibliothekscomputer-Menü (K2) ── */
+#com-panel {
+  position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+  width: 240px; display: flex; flex-direction: column; gap: 5px;
+  z-index: 5;
+}
+.com-btn {
+  border: none; cursor: pointer; text-align: left;
+  padding: 7px 14px; border-radius: 14px 3px 3px 14px;
+  background: var(--lc-blue); color: #000;
+  font-family: inherit; font-weight: 700; font-size: 12.5px; letter-spacing: 1px;
+}
+.com-btn:nth-of-type(even) { background: var(--lc-lilac); }
+.com-btn:hover { filter: brightness(1.25); }
+.com-btn.com-exit { background: var(--lc-salmon); text-align: right; border-radius: 3px 14px 14px 3px; }
+
+/* ── JA/NEIN-Schnellwahl (K1/M1) ── */
+#jn-wrap { display: flex; gap: 6px; }
+#jn-wrap[hidden] { display: none; }
+#jn-wrap button {
+  border: none; cursor: pointer; padding: 4px 18px;
+  border-radius: 13px; color: #000;
+  font-family: inherit; font-weight: 700; font-size: 12px; letter-spacing: 2px;
+}
+#jn-ja   { background: #339966; }
+#jn-nein { background: var(--lc-salmon); }
+#jn-wrap button:hover { filter: brightness(1.25); }
+
+/* ── ABBRECHEN (K3) ── */
+#cancel-btn {
+  flex-shrink: 0; border: none; cursor: pointer;
+  padding: 5px 14px; border-radius: 3px 13px 13px 3px;
+  background: #2a1215; color: #ff8a7a; border: 1px solid #8a3a30;
+  font-family: inherit; font-weight: 700; font-size: 12px; letter-spacing: 2px;
+}
+#cancel-btn:hover { background: #4a1a15; }
 
 /* Sector tokens (Terminal-Log) */
 .k  { color: #ff6b5c; font-weight: bold; }
@@ -535,13 +591,20 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
       </svg>
       <div id="sensor-fail" hidden>SENSOREN AUSGEFALLEN</div>
       <div id="warp-panel" hidden>
-        <div class="wp-title">WARP</div>
+        <div class="wp-title" id="wp-title">WARP</div>
+        <div id="wp-presets" hidden>
+          <button type="button" data-frac="0.25">25%</button>
+          <button type="button" data-frac="0.5">50%</button>
+          <button type="button" data-frac="0.75">75%</button>
+          <button type="button" data-frac="1">MAX</button>
+        </div>
         <div id="wp-col">
           <div id="wp-fill"></div>
           <div id="wp-ticks"></div>
           <div id="wp-thumb"></div>
         </div>
         <div id="wp-value">2</div>
+        <div id="wp-rest" hidden>REST-ENERGIE: —</div>
         <button class="panel-exec" type="button">AUSFÜHREN</button>
       </div>
       <div id="course-panel" hidden>
@@ -549,6 +612,16 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
         <svg id="cp-svg" viewBox="0 0 200 200" aria-label="Kompassrose"></svg>
         <div id="cp-value">KURS 1</div>
         <button class="panel-exec" type="button">AUSFÜHREN</button>
+      </div>
+      <div id="com-panel" hidden>
+        <div class="wp-title">BIBLIOTHEKSCOMPUTER</div>
+        <button type="button" class="com-btn" data-val="0">0 &middot; GALAKT. AUFZEICHNUNG</button>
+        <button type="button" class="com-btn" data-val="1">1 &middot; STATUSBERICHT</button>
+        <button type="button" class="com-btn" data-val="2">2 &middot; TORPEDO-DATEN</button>
+        <button type="button" class="com-btn" data-val="3">3 &middot; STERNENBASIS-NAV</button>
+        <button type="button" class="com-btn" data-val="4">4 &middot; ENTFERNUNGSRECHNER</button>
+        <button type="button" class="com-btn" data-val="5">5 &middot; REGIONSKARTE</button>
+        <button type="button" class="com-btn com-exit" data-val="X">ZURÜCK ZUR BRÜCKE</button>
       </div>
     </div>
   </main>
@@ -576,8 +649,13 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
     <div id="input-row">
       <span id="prompt-pill">EINGABE</span>
       <span id="prompt-text"></span>
+      <span id="jn-wrap" hidden>
+        <button id="jn-ja" type="button">JA</button>
+        <button id="jn-nein" type="button">NEIN</button>
+      </span>
       <input id="cmd" type="text" autocomplete="off" spellcheck="false" aria-label="Befehl">
       <button id="exec-btn" type="button">AUSFÜHREN</button>
+      <button id="cancel-btn" type="button" hidden>ABBRECHEN</button>
     </div>
   </section>
 
@@ -594,14 +672,20 @@ const $irow    = document.getElementById('input-row');
 const $cmd     = document.getElementById('cmd');
 const $prompt  = document.getElementById('prompt-text');
 const $pill    = document.getElementById('prompt-pill');
-const $wp      = document.getElementById('warp-panel');
-const $wpCol   = document.getElementById('wp-col');
-const $wpFill  = document.getElementById('wp-fill');
-const $wpThumb = document.getElementById('wp-thumb');
-const $wpVal   = document.getElementById('wp-value');
-const $cp      = document.getElementById('course-panel');
-const $cpSvg   = document.getElementById('cp-svg');
-const $cpVal   = document.getElementById('cp-value');
+const $wp        = document.getElementById('warp-panel');
+const $wpTitle   = document.getElementById('wp-title');
+const $wpCol     = document.getElementById('wp-col');
+const $wpFill    = document.getElementById('wp-fill');
+const $wpThumb   = document.getElementById('wp-thumb');
+const $wpVal     = document.getElementById('wp-value');
+const $wpPresets = document.getElementById('wp-presets');
+const $wpRest    = document.getElementById('wp-rest');
+const $cp        = document.getElementById('course-panel');
+const $cpSvg     = document.getElementById('cp-svg');
+const $cpVal     = document.getElementById('cp-value');
+const $com       = document.getElementById('com-panel');
+const $jn        = document.getElementById('jn-wrap');
+const $cancel    = document.getElementById('cancel-btn');
 
 let _resolveInput = null;
 let _audioCtx     = null;
@@ -692,22 +776,37 @@ async function ask(promptText = '') {
   const cmdMode = /^BEFEHL/.test(promptText);
   document.body.classList.toggle('cmd-mode', cmdMode);
   $pill.textContent = cmdMode ? 'BEFEHL' : 'EINGABE';
-  // WARPFAKTOR-Abfrage → vertikale Warp-Messsäule einblenden (Maximum aus dem Prompt)
-  const warp = /^WARPFAKTOR \(0-([\d.]+)\)/.exec(promptText);
-  if (warp) wpShow(parseFloat(warp[1]));
+  // Kontextabhängige Bedien-Panels je nach Prompt (K1–K5)
+  const warp    = /^WARPFAKTOR \(0-([\d.]+)\)/.exec(promptText);
+  const course  = /KURS \([01]-9\)/.test(promptText);
+  const phaser  = /^ANZAHL DER EINHEITEN ZUM FEUERN/.test(promptText);
+  const shields = /^ANZAHL DER EINHEITEN FÜR SCHILDE/.test(promptText);
+  const jn      = /\(J\/N\)/.test(promptText);
+  const com     = /^COMPUTER AKTIV/.test(promptText);
+  const g       = window.GAME;
+
+  if (warp)                wpShow({mode: 'warp',    max: parseFloat(warp[1])});
+  else if (phaser && g)    wpShow({mode: 'energie', max: Math.floor(g.energyLevel)});
+  else if (shields && g)   wpShow({mode: 'schilde', max: Math.floor(g.energyLevel + g.shieldLevel),
+                                   value: Math.floor(g.shieldLevel)});
   else $wp.hidden = true;
-  // Kurs-Abfrage (NAV oder Torpedo) → Kompassrose einblenden
-  const course = /KURS \([01]-9\)/.test(promptText);
+
   $cp.hidden = !course;
   if (course) cpSet(1);
-  document.body.classList.toggle('slider-mode', !!warp || course);
+  $com.hidden = !com;
+  $jn.hidden = !jn;
+  document.body.classList.toggle('slider-mode', !!warp || phaser || shields || course);
+
+  // K3: Abbruch bei allen Sub-Prompts; Abbruchwert folgt der Dialog-Semantik
+  $cancel.hidden = cmdMode || jn;
+  _cancelValue = (warp || phaser) ? '0' : shields ? '-1' : com ? 'X' : '';
   await sleep(10);
   $cmd.focus();
   return new Promise(resolve => { _resolveInput = resolve; });
 }
 
-// ── Vertikale Warp-Säule: Zustand + Rendering ──
-let _wpMax = 8, _wpStep = 0.5;
+// ── Vertikale Messsäule: Warp / Phaser-Energie / Schilde ──
+let _wpMax = 8, _wpStep = 0.5, _wpMode = 'warp';
 
 /** Wert setzen (geclampt + auf Schrittweite gerundet); aktualisiert Säule + Eingabefeld. */
 function wpSet(v, writeCmd = true) {
@@ -718,20 +817,37 @@ function wpSet(v, writeCmd = true) {
   $wpFill.style.height  = p + '%';
   $wpThumb.style.bottom = `calc(${p}% - 10px)`;
   $wpVal.textContent    = v;
+  if (_wpMode === 'energie') $wpRest.textContent = `REST-ENERGIE: ${Math.floor(_wpMax - v)}`;
+  if (_wpMode === 'schilde') $wpRest.textContent = `ENERGIE: ${Math.floor(_wpMax - v)}`;
+  // Warnung: Schilde unter 200 = gefährlich niedrig
+  $wpVal.classList.toggle('warnung', _wpMode === 'schilde' && v < 200);
   if (writeCmd) $cmd.value = String(v);
   return v;
 }
 
-function wpShow(max) {
+function wpShow({mode, max, value}) {
+  _wpMode = mode;
   _wpMax  = max;
-  _wpStep = max <= 1 ? 0.05 : 0.5;
-  // Hauptmarkierungen mit Zahlen (ganze Warpstufen bzw. 0.1er-Schritte)
+  _wpStep = mode === 'warp' ? (max <= 1 ? 0.05 : 0.5)
+                            : (max >= 1500 ? 25 : max >= 300 ? 10 : 5);
+  $wpTitle.textContent = {warp: 'WARP', energie: 'PHASER-ENERGIE', schilde: 'SCHILDE'}[mode];
+  $wp.classList.toggle('mode-schilde', mode === 'schilde');
+  $wpPresets.hidden = mode === 'warp';
+  $wpRest.hidden    = mode === 'warp';
+
+  // Hauptmarkierungen mit Zahlen
   $wpCol.querySelectorAll('.wp-major').forEach(el => el.remove());
-  const majors = (max <= 1
-    ? [0.1, 0.2, 0.3, 0.4, 0.5].filter(x => x <= max)
-    : Array.from({length: Math.floor(max)}, (_, i) => i + 1)
-  ).filter(m => m < max);   // oberste Marke weglassen (würde am Rand abgeschnitten)
-  for (const m of majors) {
+  let majors;
+  if (mode === 'warp') {
+    majors = max <= 1
+      ? [0.1, 0.2, 0.3, 0.4, 0.5].filter(x => x <= max)
+      : Array.from({length: Math.floor(max)}, (_, i) => i + 1);
+  } else {
+    const s = [50, 100, 200, 250, 500, 1000, 2000].find(x => max / x <= 6) || 2000;
+    majors = [];
+    for (let m = s; m < max; m += s) majors.push(m);
+  }
+  for (const m of majors.filter(m => m < max)) {   // oberste Marke würde am Rand abgeschnitten
     const d = document.createElement('div');
     d.className = 'wp-major';
     d.style.bottom = (m / max * 100) + '%';
@@ -741,8 +857,13 @@ function wpShow(max) {
     $wpCol.appendChild(d);
   }
   $wp.hidden = false;
-  wpSet(Math.min(2, max));
+  // Startwert: Warp 2, Phaser 25 % der Energie, Schilde = aktueller Stand
+  wpSet(value != null ? value : (mode === 'warp' ? Math.min(2, max) : max * 0.25));
 }
+
+// Schnellwahl-Presets (25 % / 50 % / 75 % / MAX)
+document.querySelectorAll('#wp-presets button').forEach(b =>
+  b.addEventListener('click', () => wpSet(_wpMax * parseFloat(b.dataset.frac))));
 
 function _wpFromEvent(e) {
   const r = $wpCol.getBoundingClientRect();
@@ -826,6 +947,9 @@ function submitInput(val) {
   document.body.classList.remove('slider-mode');
   $wp.hidden = true;
   $cp.hidden = true;
+  $com.hidden = true;
+  $jn.hidden = true;
+  $cancel.hidden = true;
   const fn = _resolveInput;
   _resolveInput = null;
   fn(val);
@@ -850,6 +974,22 @@ for (const btn of [document.getElementById('exec-btn'), ...document.querySelecto
     if (_resolveInput) submitInput($cmd.value.trim());
   });
 }
+
+// Bibliothekscomputer-Menü (K2)
+document.querySelectorAll('.com-btn').forEach(btn => {
+  btn.addEventListener('click', () => { if (_resolveInput) submitInput(btn.dataset.val); });
+});
+
+// JA/NEIN-Schnellwahl bei (J/N)-Prompts (K1)
+document.getElementById('jn-ja').addEventListener('click', () => { if (_resolveInput) submitInput('J'); });
+document.getElementById('jn-nein').addEventListener('click', () => { if (_resolveInput) submitInput('N'); });
+
+// ABBRECHEN-Button + ESC-Taste (K3)
+let _cancelValue = '';
+$cancel.addEventListener('click', () => { if (_resolveInput) submitInput(_cancelValue); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _resolveInput && !$cancel.hidden) submitInput(_cancelValue);
+});
 
 function clearScreen() {
   $term.innerHTML = ''; // Log leeren — Brücken-HUD bleibt persistent erhalten
@@ -1705,12 +1845,25 @@ class Game {
     return true;
   }
 
+  async _printComputerMenu() {
+    await telePrint('FUNKTIONEN DES BIBLIOTHEKSCOMPUTERS:');
+    await telePrint('   0 = KUMULATIVE GALAKTISCHE AUFZEICHNUNG');
+    await telePrint('   1 = STATUSBERICHT');
+    await telePrint('   2 = PHOTONENTORPEDO-DATEN');
+    await telePrint('   3 = STERNENBASIS-NAVIGATIONSDATEN');
+    await telePrint('   4 = KURS-/ENTFERNUNGSRECHNER');
+    await telePrint('   5 = GALAKISCHE REGIONSKARTE');
+    await telePrint('   X = ZURÜCK ZUR BRÜCKE\n');
+  }
+
   async libraryComputer() {
     if (this.damageLevel[8] < 0) { await telePrint('COMPUTER DEAKTIVIERT'); return false; }
+    await this._printComputerMenu();
     let done = false;
     while (!done) {
-      const raw = await ask('COMPUTER AKTIV UND WARTET AUF BEFEHL? ');
+      const raw = (await ask('COMPUTER AKTIV UND WARTET AUF BEFEHL? ')).trim().toUpperCase();
       await telePrint('');
+      if (raw === '' || raw === 'X') return false;   // K2: expliziter Ausstieg
       const cmd = parseInt(raw);
       if      (cmd === 0) done = await this.cumulativeGalacticRecord();
       else if (cmd === 1) done = await this.statusReport();
@@ -1718,15 +1871,7 @@ class Game {
       else if (cmd === 3) done = await this.starbaseNavData();
       else if (cmd === 4) done = await this.distanceCalculator();
       else if (cmd === 5) done = await this.galaxyMap();
-      else {
-        await telePrint('FUNKTIONEN DES BIBLIOTHEKSCOMPUTERS:');
-        await telePrint('   0 = KUMULATIVE GALAKTISCHE AUFZEICHNUNG');
-        await telePrint('   1 = STATUSBERICHT');
-        await telePrint('   2 = PHOTONENTORPEDO-DATEN');
-        await telePrint('   3 = STERNENBASIS-NAVIGATIONSDATEN');
-        await telePrint('   4 = KURS-/ENTFERNUNGSRECHNER');
-        await telePrint('   5 = GALAKISCHE REGIONSKARTE\n');
-      }
+      else await this._printComputerMenu();
     }
     return false;
   }
@@ -2772,7 +2917,12 @@ NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
         else if (cmd === 'COM') await this.libraryComputer();
         else if (cmd === 'TAC') await this.tachyonScan();
         else if (cmd === 'TRB') await this.beamTribbles();
-        else if (cmd === 'XXX' || cmd === 'EXIT') { this.gameOver = true; }
+        else if (cmd === 'XXX' || cmd === 'EXIT') {
+          // K1: destruktive Aktion braucht Bestätigung
+          const sure = (await ask('MISSION WIRKLICH ABBRECHEN (J/N)? ')).trim().toUpperCase();
+          if (sure === 'J' || sure === 'JA') this.gameOver = true;
+          else await telePrint('ABBRUCH VERWORFEN — DIE MISSION GEHT WEITER.');
+        }
         else {
           await telePrint('BEFEHLE:  NAV  SRS  LRS  PHA  TOR  SHE  DAM  REP  COM  TAC  TRB  XXX');
         }
