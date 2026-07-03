@@ -810,12 +810,18 @@ let _wpMax = 8, _wpStep = 0.5, _wpMode = 'warp';
 /** Wert setzen (geclampt + auf Schrittweite gerundet); aktualisiert Säule + Eingabefeld. */
 function wpSet(v, writeCmd = true) {
   v = Math.min(_wpMax, Math.max(0, v));
-  v = Math.round(v / _wpStep) * _wpStep;
-  v = parseFloat(v.toFixed(2));
+  // Warp unter 1: Achtel-Schritte (0.125 = genau 1 Sektor) für Navigation im Quadranten
+  const step = (_wpMode === 'warp' && _wpMax > 1 && v < 1) ? 0.125 : _wpStep;
+  v = Math.round(v / step) * step;
+  v = parseFloat(v.toFixed(3));
   const p = _wpMax > 0 ? (v / _wpMax) * 100 : 0;
   $wpFill.style.height  = p + '%';
   $wpThumb.style.bottom = `calc(${p}% - 10px)`;
   $wpVal.textContent    = v;
+  if (_wpMode === 'warp') {
+    const sek = Math.floor(v * 8 + 0.5);   // gleiche Formel wie noOfSteps in courseControl()
+    $wpRest.textContent = `= ${sek} ${sek === 1 ? 'SEKTOR' : 'SEKTOREN'}`;
+  }
   if (_wpMode === 'energie') $wpRest.textContent = `REST-ENERGIE: ${Math.floor(_wpMax - v)}`;
   if (_wpMode === 'schilde') $wpRest.textContent = `ENERGIE: ${Math.floor(_wpMax - v)}`;
   // Warnung: Schilde unter 200 = gefährlich niedrig
@@ -832,7 +838,7 @@ function wpShow({mode, max, value}) {
   $wpTitle.textContent = {warp: 'WARP', energie: 'PHASER-ENERGIE', schilde: 'SCHILDE'}[mode];
   $wp.classList.toggle('mode-schilde', mode === 'schilde');
   $wpPresets.hidden = mode === 'warp';
-  $wpRest.hidden    = mode === 'warp';
+  $wpRest.hidden    = false;   // bei Warp: Sektoren-Anzeige (siehe wpSet)
 
   // Hauptmarkierungen mit Zahlen
   $wpCol.querySelectorAll('.wp-major').forEach(el => el.remove());
