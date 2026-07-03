@@ -1051,6 +1051,149 @@ function beep(freq = 440, ms = 200) {
   } catch (_) {}
 }
 
+// ── SFX: synthetische Star-Trek-Klänge (Web Audio, ohne Samples) ──
+// Alle Sounds werden aus Oszillatoren + weißem Rauschen mit Filter-Sweeps erzeugt.
+let _noiseBuf = null;
+
+function _sfxCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!_noiseBuf) {
+    const len = Math.floor(_audioCtx.sampleRate * 1.5);
+    _noiseBuf = _audioCtx.createBuffer(1, len, _audioCtx.sampleRate);
+    const d = _noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return _audioCtx;
+}
+
+function _sfxNoise(ctx) {
+  const src = ctx.createBufferSource();
+  src.buffer = _noiseBuf;
+  src.loop = true;
+  return src;
+}
+
+const SFX = {
+  /** Phaserstrahl: hoher Sägezahn mit fallendem Pitch, Vibrato und Bandpass. */
+  phaser(dur = 0.48) {
+    try {
+      const ctx = _sfxCtx(), t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1500, t);
+      osc.frequency.exponentialRampToValueAtTime(650, t + dur);
+      const lfo = ctx.createOscillator();          // Vibrato → „sirrender“ Strahl
+      lfo.frequency.value = 28;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 90;
+      lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.Q.value = 2;
+      bp.frequency.setValueAtTime(1600, t);
+      bp.frequency.exponentialRampToValueAtTime(800, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.10, t + 0.03);
+      g.gain.setValueAtTime(0.10, t + Math.max(0.04, dur - 0.08));
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(bp); bp.connect(g); g.connect(ctx.destination);
+      osc.start(t); lfo.start(t);
+      osc.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    } catch (_) {}
+  },
+
+  /** Photonentorpedo-Abschuss: fallender Ton + Rausch-Whoosh mit Tiefpass-Sweep. */
+  torpedo(dur = 0.6) {
+    try {
+      const ctx = _sfxCtx(), t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(950, t);
+      osc.frequency.exponentialRampToValueAtTime(70, t + dur);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.12, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(og); og.connect(ctx.destination);
+      const n = _sfxNoise(ctx);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(2600, t);
+      lp.frequency.exponentialRampToValueAtTime(180, t + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.14, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      n.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
+      osc.start(t); n.start(t);
+      osc.stop(t + dur + 0.05); n.stop(t + dur + 0.05);
+    } catch (_) {}
+  },
+
+  /** Explosion: Rauschknall durch fallenden Tiefpass + tiefer Sinus-Thump. */
+  boom(dur = 0.9) {
+    try {
+      const ctx = _sfxCtx(), t = ctx.currentTime;
+      const n = _sfxNoise(ctx);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(3200, t);
+      lp.frequency.exponentialRampToValueAtTime(90, t + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.001, t);
+      ng.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      n.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
+      const osc = ctx.createOscillator();          // Druckwelle
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, t);
+      osc.frequency.exponentialRampToValueAtTime(35, t + dur * 0.7);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.18, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.7);
+      osc.connect(og); og.connect(ctx.destination);
+      n.start(t); osc.start(t);
+      n.stop(t + dur + 0.05); osc.stop(t + dur + 0.05);
+    } catch (_) {}
+  },
+
+  /** Warpsprung: zwei verstimmte Oszillatoren fahren hoch (Warpkern), dann Rausch-Whoosh. */
+  warp(dur = 1.4) {
+    try {
+      const ctx = _sfxCtx(), t = ctx.currentTime;
+      const rise = dur * 0.75;
+      for (const det of [0, 8]) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.detune.value = det;
+        osc.frequency.setValueAtTime(60, t);
+        osc.frequency.exponentialRampToValueAtTime(800, t + rise);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(300, t);
+        lp.frequency.exponentialRampToValueAtTime(2400, t + rise);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.exponentialRampToValueAtTime(0.07, t + rise * 0.4);
+        g.gain.setValueAtTime(0.07, t + rise);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(lp); lp.connect(g); g.connect(ctx.destination);
+        osc.start(t); osc.stop(t + dur + 0.05);
+      }
+      const n = _sfxNoise(ctx);                    // „Sprung“ am Ende des Hochfahrens
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(4000, t + rise);
+      lp.frequency.exponentialRampToValueAtTime(200, t + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.001, t);
+      ng.gain.setValueAtTime(0.001, t + rise - 0.05);
+      ng.gain.exponentialRampToValueAtTime(0.16, t + rise + 0.03);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      n.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
+      n.start(t); n.stop(t + dur + 0.05);
+    } catch (_) {}
+  },
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LCARS-GRAFIK-ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1229,6 +1372,7 @@ function renderBridge(g = window.GAME) {
 // ── Waffen-/Treffer-Effekte auf der SVG-Karte ──
 const FX = {
   async phaser(r1, c1, r2, c2, color = '#67d8ff') {
+    SFX.phaser();
     const [x1, y1] = cellXY(r1, c1), [x2, y2] = cellXY(r2, c2);
     const l = svgEl('line', {x1, y1, x2, y2, stroke: color, 'stroke-width': 3,
                              'stroke-linecap': 'round', filter: 'url(#fglow)'}, $fx);
@@ -1247,6 +1391,7 @@ const FX = {
   },
 
   async boom(row, col) {
+    SFX.boom();
     const [cx, cy] = cellXY(row, col);
     const ring  = svgEl('circle', {cx, cy, r: 4, fill: 'none', stroke: '#ffaa33',
                                    'stroke-width': 4, filter: 'url(#fglow)'}, $fx);
@@ -2122,6 +2267,8 @@ class Game {
     this.stepX1  = cCurr[0] + (cNext[0] - cCurr[0]) * frac;
     this.stepX2  = cCurr[1] + (cNext[1] - cCurr[1]) * frac;
 
+    SFX.warp(Math.min(2, 0.8 + warpFactor * 0.15));
+
     let x = this.s1, y = this.s2;
     this.q4 = this.q1; this.q5 = this.q2;
 
@@ -2369,7 +2516,6 @@ class Game {
       if (this.k[i][2] > 0) {
         await telePrint(`   (SENSOREN ZEIGEN ${Math.floor(this.k[i][2])} EINHEITEN VERBLEIBEND)`, 800);
       } else {
-        beep(660,120); beep(880,200);
         await FX.boom(this.k[i][0], this.k[i][1]);
         await telePrint('*** KLINGONE VERNICHTET ***', 800);
         this.k3--; this.shipCondition = this._checkShipStatus(); this.totalKlingonShips--;
@@ -2398,7 +2544,6 @@ class Game {
       if (this.r[i][2] > 0) {
         await telePrint(`   (SENSOREN ZEIGEN ${Math.floor(this.r[i][2])} EINHEITEN VERBLEIBEND)`, 800);
       } else {
-        beep(660,120); beep(880,200);
         await FX.boom(this.r[i][0], this.r[i][1]);
         await telePrint('*** ROMULANER VERNICHTET ***', 800);
         this.r3--; this.shipCondition = this._checkShipStatus(); this.totalRomulanShips--;
@@ -2439,6 +2584,7 @@ class Game {
     const sx2   = cCurr[1] + (cNext[1] - cCurr[1]) * frac;
 
     let x = this.s1, y = this.s2;
+    SFX.torpedo();
     await telePrint('TORPEDOSPUR:');
 
     let done = false;
@@ -2454,7 +2600,6 @@ class Game {
       await telePrint(`               ${x3} , ${y3}`, 400);
 
       if (this._searchStringInQuadrant('+K+', x, y)) {
-        beep(660,120); beep(880,200);
         await FX.boom(x3, y3);
         await telePrint('*** KLINGONE VERNICHTET ***', 800);
         this.k3--; this.shipCondition = this._checkShipStatus(); this.totalKlingonShips--;
@@ -2466,7 +2611,6 @@ class Game {
         if (this.k3 === 0) await this._checkScottyRescue();
         done = true;
       } else if (this._searchStringInQuadrant('{R}', x, y)) {
-        beep(660,120); beep(880,200);
         await FX.boom(x3, y3);
         await telePrint('*** ROMULANER VERNICHTET ***', 800);
         this.r3--; this.shipCondition = this._checkShipStatus(); this.totalRomulanShips--;
@@ -2552,7 +2696,7 @@ class Game {
     let destroyed = 0;
     for (let i = 1; i <= 3; i++) {
       if (this.k[i][2] > 0) {
-        beep(660,120); beep(880,200);
+        SFX.boom();
         await telePrint(`*** KLINGONE BEI SEKTOR ${this.k[i][0]},${this.k[i][1]} VON TRIBBLES ÜBERWÄLTIGT — VERNICHTET ***`, 800);
         this._addElementInQuadrantString('   ', this.k[i][0], this.k[i][1]);
         this.k[i][2] = 0; destroyed++;
