@@ -366,6 +366,15 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
   letter-spacing: 1px; padding: 3px 0;
 }
 
+/* Bestätigen-Button direkt unter Warp-Säule / Kompassrose */
+.panel-exec {
+  border: none; cursor: pointer;
+  padding: 6px 0; border-radius: 4px 4px 14px 14px;
+  background: var(--lc-salmon); color: #000;
+  font-family: inherit; font-weight: 700; font-size: 13px; letter-spacing: 2px;
+}
+.panel-exec:hover { filter: brightness(1.25); }
+
 /* Sector tokens (Terminal-Log) */
 .k  { color: #ff6b5c; font-weight: bold; }
 .sb { color: #6fd68b; font-weight: bold; }
@@ -533,11 +542,13 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
           <div id="wp-thumb"></div>
         </div>
         <div id="wp-value">2</div>
+        <button class="panel-exec" type="button">AUSFÜHREN</button>
       </div>
       <div id="course-panel" hidden>
         <div class="wp-title">KURS</div>
         <svg id="cp-svg" viewBox="0 0 200 200" aria-label="Kompassrose"></svg>
         <div id="cp-value">KURS 1</div>
+        <button class="panel-exec" type="button">AUSFÜHREN</button>
       </div>
     </div>
   </main>
@@ -833,10 +844,12 @@ document.querySelectorAll('.lcars-btn').forEach(btn => {
   });
 });
 
-// AUSFÜHREN-Button = Enter
-document.getElementById('exec-btn').addEventListener('click', () => {
-  if (_resolveInput) submitInput($cmd.value.trim());
-});
+// AUSFÜHREN-Buttons (Eingabezeile + Panel-Buttons) = Enter
+for (const btn of [document.getElementById('exec-btn'), ...document.querySelectorAll('.panel-exec')]) {
+  btn.addEventListener('click', () => {
+    if (_resolveInput) submitInput($cmd.value.trim());
+  });
+}
 
 function clearScreen() {
   $term.innerHTML = ''; // Log leeren — Brücken-HUD bleibt persistent erhalten
