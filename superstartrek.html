@@ -630,7 +630,7 @@ body.slider-mode #cmd { flex: 0 0 76px; text-align: center; }
     <div class="srow"><span>STERNZEIT</span><b id="st-date">—</b></div>
     <div class="srow"><span>VERBLEIBENDE TAGE</span><b id="st-days">—</b></div>
     <div class="srow"><span>SEKTOR</span><b id="st-sect">—</b></div>
-    <div class="srow"><span>GEGNER</span><b id="st-enemy">—</b></div>
+    <div class="srow"><span>KLINGONEN</span><b id="st-enemy">—</b></div>
     <div class="srow"><span>ENERGIE</span><b id="st-energy">—</b></div>
     <div class="gauge" id="g-energy"><div class="fill"></div></div>
     <div class="srow"><span>SCHILDE</span><b id="st-shield">—</b></div>
@@ -1319,7 +1319,7 @@ function renderBridge(g = window.GAME) {
   setText('st-date',   g._roundTo(g.stardate, 1));
   setText('st-days',   Math.max(0, g._roundTo(g.t0 + g.maxNumOfDays - g.stardate, 1)));
   setText('st-sect',   `${Math.floor(g.s1)} , ${Math.floor(g.s2)}`);
-  setText('st-enemy',  `${Math.floor(g.totalKlingonShips)} K · ${Math.floor(g.totalRomulanShips)} R`);
+  setText('st-enemy',  Math.floor(g.totalKlingonShips));
   setText('st-energy', Math.floor(g.energyLevel));
   setText('st-shield', Math.floor(g.shieldLevel));
   setText('st-torp',   Math.floor(g.photonTorpedoes));
@@ -1747,7 +1747,7 @@ class Game {
     if (await this._cloakedRomulansIntercept()) return false;
 
     await telePrint(`LANGSTRECKENSCAN FÜR QUADRANT ${this.q1},${this.q2}`);
-    const sep = '-----------------------';
+    const sep = '-------------------';
     await telePrint(sep);
 
     for (let i = this.q1 - 1; i <= this.q1 + 1; i++) {
@@ -1763,12 +1763,12 @@ class Game {
       for (const val of n) {
         rowStr += ': ';
         if (val < 0) {
-          rowStr += '**** ';
+          rowStr += '*** ';
         } else {
-          const rCount = Math.floor(val / 100) % 10;
-          let dv = val;
-          if (rCount > 0) dv = Math.max(0, val + Math.floor(Math.random() * 3) - 1);
-          rowStr += String(dv + 10000).slice(1, 5) + ' ';
+          // Romulaner (Hunderterstelle) ausblenden: Tarnvorrichtungen entziehen sie
+          // den Langstreckensensoren — Anzeige klassisch KBS (Issue #3)
+          const masked = Math.floor(val / 1000) * 100 + (val % 100);
+          rowStr += String(masked + 1000).slice(1, 4) + ' ';
         }
       }
       await telePrint(rowStr + ':');
@@ -1946,8 +1946,12 @@ class Game {
       } else {
         for (let j = 1; j <= 8; j++) {
           row += '   ';
-          if (this.exploredSpace[i][j] === 0) { row += '****'; }
-          else { row += String(this.exploredSpace[i][j] + 10000).slice(1, 5); }
+          if (this.exploredSpace[i][j] === 0) { row += '***'; }
+          else {
+            // wie beim LRS: Romulaner-Stelle maskiert, KBS-Format (Issue #3)
+            const v = this.exploredSpace[i][j];
+            row += String(Math.floor(v / 1000) * 100 + (v % 100) + 1000).slice(1, 4);
+          }
         }
       }
       await telePrint(row);
@@ -1972,8 +1976,8 @@ class Game {
     await telePrint('   STATUSBERICHT:');
     const ks = this.totalKlingonShips === 1 ? '' : 'E';
     await telePrint(`KLINGON${ks} VERBLIEBEN: ${this.totalKlingonShips}`);
-    const rs = this.totalRomulanShips === 1 ? '' : 'E';
-    await telePrint(`ROMULANER${rs} VERBLIEBEN: ${this.totalRomulanShips}`);
+    if (this.totalRomulanShips > 0)
+      await telePrint('ROMULANISCHE AKTIVITÄT GEMELDET — ANZAHL UND POSITIONEN UNBEKANNT');
     await telePrint(`MISSION MUSS ABGESCHLOSSEN WERDEN IN ${this._roundTo(this.t0 + this.maxNumOfDays - this.stardate, 1)} STERNDATEN`);
     if (this.totalStarbases < 1) {
       await telePrint('IHRE DUMMHEIT HAT SIE ALLEIN IN DER GALAXIS GELASSEN');
@@ -2079,7 +2083,8 @@ class Game {
   }
 
   _checkAllEnemiesDefeated() {
-    if (this.totalKlingonShips <= 0 && this.totalRomulanShips <= 0) {
+    // Sieg, wenn alle Klingonen vernichtet sind — Romulaner sind Gefahr, nicht Auftrag (Issue #3)
+    if (this.totalKlingonShips <= 0) {
       this.gameOver = true; // set synchronously so the main loop exits immediately
       this._allEnemiesDefeatedAsync(); // fire-and-forget for victory messages
       return true;
@@ -2089,9 +2094,12 @@ class Game {
 
   async _allEnemiesDefeatedAsync() {
     beep(523,150); beep(659,150); beep(784,150); beep(1047,400);
-    await telePrint('\nGLÜCKWUNSCH, CAPTAIN! ALLE FEINDLICHEN KRÄFTE WURDEN ELIMINIERT.');
+    await telePrint('\nGLÜCKWUNSCH, CAPTAIN! ALLE KLINGONISCHEN KRIEGSSCHIFFE WURDEN VERNICHTET.');
     await telePrint(`DIE LETZTE BEDROHUNG DER FÖRDERATION WURDE AM STERNDATUM ${this._roundTo(this.stardate,1)} VERNICHTET`);
-    const total = this.initialKlingonShips + this.initialRomulanShips;
+    if (this.totalRomulanShips > 0)
+      await telePrint('DIE VERBLIEBENEN ROMULANISCHEN WARBIRDS ZIEHEN SICH IN IHR TERRITORIUM ZURÜCK.');
+    // Effizienz: vernichtete Schiffe — erlegte Romulaner zählen als Bonus
+    const total = this.initialKlingonShips + (this.initialRomulanShips - this.totalRomulanShips);
     const elapsed = this.stardate - this.t0;
     if (total > 0 && elapsed > 0)
       await telePrint(`\nIHRE EFFIZIENZWERTUNG IST ${Math.floor(1000 * (total / elapsed) ** 2)}`);
@@ -2986,10 +2994,12 @@ NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
     const bs = this.totalStarbases > 1 ? 'STERNENBASEN' : 'STERNENBASIS';
     const bv = this.totalStarbases > 1 ? ' SIND' : ' IST';
     await telePrint('IHRE BEFEHLE LAUTEN WIE FOLGT:');
-    await telePrint(` VERNICHTEN SIE DIE ${this.totalKlingonShips} KLINGONISCHEN KRIEGSSCHIFFE UND ${this.totalRomulanShips} ROMULANISCHEN WARBIRDS`);
-    await telePrint(' DIE IN DIE GALAXIS EINGEDRUNGEN SIND, BEVOR SIE DAS FÖDERATIONSHAUPTQUARTIER ANGREIFEN KÖNNEN');
+    await telePrint(` VERNICHTEN SIE DIE ${this.totalKlingonShips} KLINGONISCHEN KRIEGSSCHIFFE, DIE IN DIE GALAXIS EINGEDRUNGEN`);
+    await telePrint(' SIND, BEVOR SIE DAS FÖDERATIONSHAUPTQUARTIER ANGREIFEN KÖNNEN');
     await telePrint(` BIS ZUM STERNDATUM ${this.t0 + this.maxNumOfDays}. DAS GIBT IHNEN ${this.maxNumOfDays} TAGE.`);
-    await telePrint(" VORSICHT: ROMULANER BENUTZEN TARNVORRICHTUNGEN. BENUTZEN SIE 'TAC' FÜR TACHYON-SCAN.");
+    await telePrint(' VORSICHT: GETARNTE ROMULANISCHE WARBIRDS WURDEN GESICHTET. SIE SIND NICHT TEIL');
+    await telePrint(" IHRES AUFTRAGS, ABER GEFÄHRLICH — LANGSTRECKENSENSOREN ERFASSEN SIE NICHT.");
+    await telePrint(" IM QUADRANTEN HILFT 'TAC' (TACHYON-SCAN) GEGEN DIE TARNUNG.");
     await telePrint(` ES${bv} ${this.totalStarbases} ${bs} IN DER GALAXIS ZUM NACHVERSORGEN IHRES SCHIFFES.`);
     await telePrint('');
     await sleep(800);
@@ -3129,8 +3139,6 @@ NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
     await telePrint('');
     if (this.totalKlingonShips > 0)
       await telePrint(`ES VERBLIEBEN ${this.totalKlingonShips} KLINGONISCHE KAMPFKREUZER AM ENDE IHRER MISSION, STERNDATUM ${this._roundTo(this.stardate, 1)}`);
-    if (this.totalRomulanShips > 0)
-      await telePrint(`ES VERBLIEBEN ${this.totalRomulanShips} ROMULANISCHE WARBIRDS AM ENDE IHRER MISSION, STERNDATUM ${this._roundTo(this.stardate, 1)}`);
     await telePrint('\n\nDanke fürs Spielen!');
     await telePrint('\nJavaScript-Port 2026 — Original-Lua-Konvertierung von Emanuele Bolognesi\n');
   }

@@ -16,7 +16,7 @@ python -m http.server 8787
 
 ## Über das Spiel
 
-Als Kommandant der Enterprise übernimmst du das Kommando über die Galaxis und musst alle Klingonen und Romulaner vernichten, bevor deine Energie oder Zeit aufgebraucht ist. Das Spiel ist vollständig auf **Deutsch**.
+Als Kommandant der Enterprise übernimmst du das Kommando über die Galaxis und musst alle Klingonen vernichten, bevor deine Energie oder Zeit aufgebraucht ist. Getarnte romulanische Warbirds streifen als unsichtbare Gefahr durch die Quadranten — sie sind nicht Teil des Auftrags, aber wer ihnen begegnet, sollte kampfbereit sein. Das Spiel ist vollständig auf **Deutsch**.
 
 ### Features
 - Klassisches Super-Star-Trek-Gameplay, modernisiert für den Browser

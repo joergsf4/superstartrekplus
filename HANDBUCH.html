@@ -348,11 +348,11 @@
 
     <!-- TL;DR -->
     <h2 id="tldr">TL;DR – In 2 Minuten spielbereit</h2>
-    <p><strong>Ziel:</strong> Alle Klingonen und Romulaner vernichten, bevor das Sterndatum-Limit abläuft.</p>
+    <p><strong>Ziel:</strong> Alle Klingonen vernichten, bevor das Sterndatum-Limit abläuft. Romulaner sind <em>nicht</em> Teil des Auftrags – sie lauern getarnt als zusätzliche Gefahr.</p>
     <div class="strategy">
       <ol>
         <li><code>SRS</code> – siehst du <code class="sym-kling">+K+</code> oder <code class="sym-rom">{R}</code>? Dann kämpfen. Sonst weiter.</li>
-        <li><code>LRS</code> – schau, wo Feinde sind (erste Ziffer = Klingonen). Fliege dorthin.</li>
+        <li><code>LRS</code> – schau, wo Klingonen sind (erste Ziffer). Fliege dorthin. Romulaner erfasst der Scan nicht!</li>
         <li><code>NAV</code> – Kurs (1–8, Himmelsrichtung) und Warpfaktor (1 = ein Quadrant) eingeben.</li>
         <li><code>SHE</code> – vor dem Kampf Schilde hochsetzen, z. B. <code>500</code>.</li>
         <li><code>PHA</code> – Phaser auf Feinde feuern, Energiemenge angeben (z. B. <code>800</code>).</li>
@@ -535,7 +535,7 @@ FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
     <h3 id="tac"><code>TAC</code> – Tachyon-Scan</h3>
     <p>Kostet <strong>50 Energie</strong>. Enttarnt alle getarnten Romulaner im aktuellen Quadrant dauerhaft für diese Runde.</p>
     <ul>
-      <li>Nur sinnvoll wenn der LRS Romulaner anzeigt, aber <code>SRS</code> keinen <code>{R}</code> zeigt</li>
+      <li>Sinnvoll bei Verdacht auf Getarnte: wenn du beim Einflug beschossen wirst oder <code>COM 2</code> getarnte Signale meldet</li>
       <li>Nach dem Scan werden enttarnte Romulaner als <code class="sym-rom">{R}</code> angezeigt und können bekämpft werden</li>
     </ul>
 
@@ -568,7 +568,7 @@ FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
     </ul>
 
     <h4>LRS-Hinweis</h4>
-    <p>Der Langstrecken-Scan zeigt Romulaner mit leichten Anzeigefehlern (±1) – eine Täuschungsmaßnahme.</p>
+    <p>Der Langstrecken-Scan erfasst Romulaner <strong>überhaupt nicht</strong> – ihre Tarnvorrichtungen entziehen sie den Sensoren. Wo sie lauern, merkst du erst beim Einflug. Romulaner zu vernichten ist optional, verbessert aber die Effizienzwertung am Spielende.</p>
 
     <h4>Hinterhalt</h4>
     <p>Wenn ein Romulaner in dieser Runde enttarnt wird und <strong>sofort danach</strong> angreift, kann er Doppelschaden verursachen. <strong>Schilde hochhalten!</strong></p>
@@ -681,10 +681,10 @@ FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
     <div class="strategy">
       <ol>
         <li><code>SRS</code> – orientieren, Klingonen und Romulaner suchen</li>
-        <li><code>LRS</code> – Nachbarquadranten erkunden, Feinde markieren</li>
-        <li><code>NAV</code> – in einen Quadrant mit Feinden fliegen</li>
+        <li><code>LRS</code> – Nachbarquadranten erkunden, Klingonen markieren (Romulaner bleiben unsichtbar)</li>
+        <li><code>NAV</code> – in einen Quadrant mit Klingonen fliegen</li>
         <li><code>SHE</code> – Schilde auf mindestens 300–500 setzen</li>
-        <li><code>TAC</code> – falls Romulaner im LRS aber nicht auf SRS sichtbar</li>
+        <li><code>TAC</code> – bei Verdacht auf getarnte Romulaner (Beschuss aus dem Nichts)</li>
         <li><code>COM 2</code> – Torpedokurs berechnen lassen</li>
         <li><code>TOR</code> / <code>PHA</code> – Feinde eliminieren</li>
         <li><code>TRB</code> – bei Tribble-Befall + Klingonen im Quadrant ausnutzen</li>
