@@ -210,7 +210,6 @@ use.rom  { animation: romFlicker 2.6s ease-in-out infinite; }
 #gmap div.unk { background: #06060b; }
 #gmap div.cur { outline: 2px solid #57d8ff; outline-offset: -1px; z-index: 1; }
 #gmap b.gk { color: #ff5050; font-weight: 700; }
-#gmap b.gr { color: #ff66ff; font-weight: 700; }
 #gmap i.gb { width: 4px; height: 4px; background: #57d8ff; border-radius: 50%; }
 
 /* ── Kommunikationskonsole ── */
@@ -1365,9 +1364,9 @@ function renderBridge(g = window.GAME) {
     const val = g.exploredSpace[i][j];
     if (i === g.q1 && j === g.q2) d.classList.add('cur');
     if (val > 0) {
-      const kk = Math.floor(val / 1000), rr = Math.floor(val / 100) % 10, bb = Math.floor(val / 10) % 10;
+      // Romulaner-Ziffer wird nicht gerendert: Tarnvorrichtungen (Issue #3)
+      const kk = Math.floor(val / 1000), bb = Math.floor(val / 10) % 10;
       if (kk) { const b = document.createElement('b'); b.className = 'gk'; b.textContent = kk; d.appendChild(b); }
-      if (rr) { const b = document.createElement('b'); b.className = 'gr'; b.textContent = rr; d.appendChild(b); }
       if (bb) { const b = document.createElement('i'); b.className = 'gb'; d.appendChild(b); }
     } else if (!(i === g.q1 && j === g.q2)) {
       d.classList.add('unk');
