@@ -1105,6 +1105,7 @@ class Game {
       this.shieldLevel = units;
       await telePrint('BERICHT DER DEFLEKTOR-SCHALTSTELLE:');
       await telePrint(`  'SCHILDE JETZT BEI ${this.shieldLevel} EINHEITEN GEMÄSS IHREM BEFEHL.'`);
+      await this._tacticalTurn();
     }
     return this.shieldLevel;
   }
@@ -1143,7 +1144,7 @@ class Game {
       const ans = await ask('GENEHMIGEN SIE DEN REPARATURAUFTRAG (J/N)? ');
       if (ans.toUpperCase() === 'J') {
         for (let i = 1; i <= 8; i++) if (this.damageLevel[i] < 0) this.damageLevel[i] = 0;
-        this.stardate += timeToRepair + 0.1;
+        if (await this._passTime(timeToRepair + 0.1)) return true;
         await telePrint('REPARATUR ABGESCHLOSSEN.');
       }
     }
@@ -1226,11 +1227,8 @@ class Game {
     }
 
     // Reparaturarbeiten im Kampf: Gegner nutzen die Ablenkung zum Angriff
-    if (this.k3 > 0 || this.r3 > 0) {
-      await telePrint('\nFEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!');
-      await this._klingonsAttack();
-      await this._romulansAttack();
-    }
+    if (this.k3 > 0 || this.r3 > 0) await telePrint('\nFEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!');
+    await this._tacticalTurn();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1407,6 +1405,38 @@ class Game {
     this.gameOver = true;
   }
 
+  // Zeit vergeht: Sterndatum rückt vor, Schäden heilen im selben Maß. true = Zeit abgelaufen.
+  async _passTime(days) {
+    this.stardate = Math.round((this.stardate + days) * 1000) / 1000;   // keine Rundungsdrift bei 0,1-Schritten
+    for (let i = 1; i <= 8; i++) {
+      if (this.damageLevel[i] >= 0) continue;
+      this.damageLevel[i] += days;
+      if (this.damageLevel[i] > -0.1 && this.damageLevel[i] < 0) this.damageLevel[i] = -0.1;
+      else if (this.damageLevel[i] >= 0)
+        await telePrint(`SCHADENSBERICHT: '${Game.DEVICE_NAMES[i]} REPARATUR ABGESCHLOSSEN.'`);
+    }
+    if (this.stardate <= this.t0 + this.maxNumOfDays) return false;
+    await this._timeExpired();
+    this.gameOver = true;
+    return true;
+  }
+
+  // Gegnerzug: Romulaner tarnen/enttarnen sich, dann feuern alle sichtbaren Gegner. true = Enterprise zerstört.
+  async _enemyTurn() {
+    this._romulansClockCycle();
+    return await this._klingonsAttack() || await this._romulansAttack();
+  }
+
+  // Taktische Aktion (SHE, PHA, TOR, TAC, TRB, REP): Gegner sind am Zug, dann vergeht 0,1 Sterndatum.
+  async _tacticalTurn() {
+    return await this._enemyTurn() || await this._passTime(0.1);
+  }
+
+  // Flugzeit: unter Warp 1 der Warpfaktor, sonst ein Sterndatum
+  _travelDays() {
+    return this.warpFactor < 1 ? this._roundTo(this.warpFactor, 1) : 1;
+  }
+
   async _timeExpired() {
     await telePrint('\nZU SPÄT, CAPTAIN!  DIE FÖDERATION WURDE EROBERT.');
   }
@@ -1416,6 +1446,11 @@ class Game {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async _consumeEnergy() {
+    if (this.tribblesInfested) {
+      const drain = 200;
+      this.energyLevel = Math.max(0, this.energyLevel - drain);
+      await telePrint(`TRIBBLES VERBRAUCHEN ${drain} ENERGIEEINHEITEN. ENERGIE JETZT BEI ${Math.floor(this.energyLevel)}.`);
+    }
     this.energyLevel -= this.noOfSteps + 10;
     if (this.energyLevel >= 0) return this.energyLevel;
     await telePrint('SCHILDSTEUERUNG LIEFERT ENERGIE ZUM ABSCHLUSS DES MANÖVERS.');
@@ -1432,22 +1467,7 @@ class Game {
   async _endOfMovementInQuadrant() {
     this._addElementInQuadrantString('<*>', Math.floor(this.s1), Math.floor(this.s2));
     await this._consumeEnergy();
-
-    if (this.tribblesInfested) {
-      const drain = 200;
-      this.energyLevel = Math.max(0, this.energyLevel - drain);
-      await telePrint(`TRIBBLES VERBRAUCHEN ${drain} ENERGIEEINHEITEN. ENERGIE JETZT BEI ${Math.floor(this.energyLevel)}.`);
-    }
-
-    let dayIncrement = 1;
-    if (this.warpFactor < 1) dayIncrement = this._roundTo(this.warpFactor, 1);
-    this.stardate += dayIncrement;
-
-    if (this.stardate > this.t0 + this.maxNumOfDays) {
-      await this._timeExpired();
-      this.gameOver = true;
-      return true;
-    }
+    if (await this._passTime(this._travelDays())) return true;
     await this._checkIfDocked();
     await this.shortRangeSensorScan();
     return false;
@@ -1484,13 +1504,8 @@ class Game {
 
     if (this.q1 * 8 + this.q2 === this.q4 * 8 + this.q5) return false; // Quadrant unverändert
 
-    this.stardate += 1;
-    if (this.stardate > this.t0 + this.maxNumOfDays) {
-      await this._timeExpired();
-      this.gameOver = true;
-      return true;
-    }
     await this._consumeEnergy();
+    await this._passTime(this._travelDays());
     return true;
   }
 
@@ -1548,20 +1563,7 @@ class Game {
     }
 
     await this._romulansReposition();
-    this._romulansClockCycle();
-    if (await this._klingonsAttack())  return false;
-    if (await this._romulansAttack())  return false;
-
-    // Reparatur
-    const repairFactor = warpFactor < 1 ? warpFactor : 1.0;
-    for (let i = 1; i <= 8; i++) {
-      if (this.damageLevel[i] < 0) {
-        this.damageLevel[i] += repairFactor;
-        if (this.damageLevel[i] > -0.1 && this.damageLevel[i] < 0) this.damageLevel[i] = -0.1;
-        else if (this.damageLevel[i] >= 0)
-          await telePrint(`SCHADENSBERICHT: '${Game.DEVICE_NAMES[i]} REPARATUR ABGESCHLOSSEN.'`);
-      }
-    }
+    if (await this._enemyTurn()) return false;
 
     // Zufälliges Schadens/Reparaturereignis
     if (Math.random() <= 0.2) {
@@ -1852,8 +1854,7 @@ class Game {
         this._updateQuadrantRecord();
       }
     }
-    await this._klingonsAttack();
-    await this._romulansAttack();
+    await this._tacticalTurn();
     return false;
   }
 
@@ -1937,8 +1938,7 @@ class Game {
       }
       // Leerer Raum: continue
     }
-    await this._klingonsAttack();
-    await this._romulansAttack();
+    await this._tacticalTurn();
     return true;
   }
 
@@ -1972,6 +1972,7 @@ class Game {
     } else {
       await telePrint(`TACHYON-SCAN ENTDECKT ${this.r3} ROMULANISCHE WARBIRDS — ALLE BEREITS SICHTBAR`);
     }
+    await this._tacticalTurn();
     await this.shortRangeSensorScan();
     return false;
   }
@@ -2005,6 +2006,7 @@ class Game {
     await telePrint('ENTERPRISE IST JETZT TRIBBLE-FREI!');
     if (this._checkAllEnemiesDefeated()) return true;
     await this._checkScottyRescue();
+    await this._tacticalTurn();
     await this.shortRangeSensorScan();
     return true;
   }
@@ -2142,7 +2144,7 @@ class Game {
         beep(300,200);
         await telePrint('*** TRIBBLES AN BORD DER ENTERPRISE ENTDECKT! ***');
         await telePrint('DIE KLEINEN KREATUREN HABEN SICH ÜBERALL VERBREITET.');
-        await telePrint('INGENIEURSWESEN: SIE VERBRAUCHEN 200 ENERGIE PRO WARPSPRUNG.');
+        await telePrint('INGENIEURSWESEN: SIE VERBRAUCHEN 200 ENERGIE PRO FLUG.');
         await telePrint("TIPP: BENUTZEN SIE 'TRB' WENN KLINGONEN ANWESEND SIND, UM SIE HINÜBERZUBEAMEN!");
       } else {
         await telePrint("'ES WAR MIR EIN VERGNÜGEN, CAPTAIN.'");
@@ -2258,7 +2260,9 @@ class Game {
 
    ANDOCKEN: STEUERN SIE EIN FELD DIREKT NEBEN EINER STERNENBASIS >!< AN,
    DANN WERDEN ENERGIE UND TORPEDOS AUFGEFÜLLT.
-   ZEIT: JEDER FLUG MIT WARP 1 ODER MEHR KOSTET EIN STERNDATUM.
+   ZEIT: FLÜGE KOSTEN BIS ZU 1 STERNDATUM. SHE, PHA, TOR, TAC, TRB UND REP
+   KOSTEN JE 0,1 STERNDATUM - DANACH IST DER GEGNER AM ZUG. SCANS UND
+   COMPUTER SIND FREI. SCHÄDEN HEILEN MIT DER ZEIT.
    ROMULANER SIND NICHT TEIL DES AUFTRAGS, ABER GEFÄHRLICH - UND FÜR DIE
    LANGSTRECKENSENSOREN UNSICHTBAR. GETARNTE SCHIFFE SIND NICHT ZU TREFFEN.
    FALSCHE EINGABEN BRECHEN EINEN BEFEHL AB. MIT DEN PFEILTASTEN

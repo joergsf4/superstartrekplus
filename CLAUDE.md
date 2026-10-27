@@ -48,6 +48,7 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
   `shortRangeSensorScan()` rendert die Brücke neu: Sektorkarte, Statuswerte, `_enterpriseSchematic()`
   (Schilde + Geräteschäden) und Crew-Leiste. Reine Tastatureingabe.
 - Sound: `beep()` (Rechteckton) und `SFX.phaser()/torpedo()/boom()/warp()` (Web Audio, ohne Samples).
+- Rundenmodell: `_passTime(days)` lässt Zeit vergehen (Sterndatum, Selbstreparatur, Zeitablauf); `_enemyTurn()` = Tarnzyklus + Gegnerfeuer; `_tacticalTurn()` = Gegnerzug + 0,1 Sterndatum für SHE/PHA/TOR/TAC/TRB/REP. NAV: Gegnerzug vor der Bewegung, Flugzeit `_travelDays()`. Informationsbefehle sind frei.
 - Sonderereignisse zeigen ASCII-Grafiken aus `EVENT_ART` über `printArt()`; `«klasse|text»` in einer Zeile färbt einen Abschnitt (CSS-Klasse).
 - Farben: `safeHtml()` (Token → PUA-Escaping → `<span>`) + `colorMsg()` (Nachrichtenklassen) im Terminal-Log.
 

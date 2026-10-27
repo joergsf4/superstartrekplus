@@ -86,7 +86,7 @@ Möglichkeit, eine Tribble-Plage ohne Klingonen loszuwerden.
 2. `added = maxTorpedoes - floor(photonTorpedoes)`; `photonTorpedoes = maxTorpedoes`.
 3. Mit **50 % Wahrscheinlichkeit** (`Math.random() < 0.50`):
    - `tribblesInfested = true`
-   - Warnung: Tribbles verbrauchen 200 Energie pro Warpsprung; Tipp `TRB` nutzen.
+   - Warnung: Tribbles verbrauchen 200 Energie pro Flug; Tipp `TRB` nutzen.
 4. Sonst: freundlicher Abschied, kein Nachteil.
 
 Gemischtes Ereignis: garantierter Nutzen (Torpedos), riskanter Nebeneffekt (Tribbles).
@@ -211,8 +211,8 @@ da diese nur bei Quadrantenwechseln auslöst).
 Tribbles sind kein ortsgebundenes Ereignis, sondern ein **Zustand** (`tribblesInfested`),
 ausgelöst durch Cyrano Jones (50 %).
 
-**Effekt:** Bei jedem Quadrantenwechsel −200 Energie
-(`_endOfMovementInQuadrant`, `superstartrek.html:1175-1179`).
+**Effekt:** Bei jedem Flug (`NAV`), innerhalb des Quadranten wie beim Quadrantenwechsel, −200 Energie
+(`_consumeEnergy()`).
 
 **Beseitigung:**
 
@@ -239,4 +239,4 @@ Anschließend Prüfung auf Sieg bzw. Scotty-Befreiung.
 | 5 | Scotty-Entführung | zufällig (15 %) | Klingonen + Scotty frei | Geisel; Reparaturen teurer/langsamer |
 | 6 | Scotty-Befreiung | bedingt | Letzter Klingone in anderem Quadrant besiegt | Zustand normalisiert |
 | 7 | Space Seed (Khan) | ortsgebunden → Zustand | Quadrant betreten | Sabotage + −150 Energie/Sprung; löst sich nach 2–8 Sprüngen (Crew ausgesetzt auf „<REGION> V") |
-| – | Tribbles | Zustand | Folge von #3 | −200 Energie / Warpsprung |
+| – | Tribbles | Zustand | Folge von #3 | −200 Energie / Flug |

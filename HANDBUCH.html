@@ -364,7 +364,8 @@
       <strong>Faustregeln:</strong> Schilde immer auf 300–500. <code>LRS</code> nach jedem Quadrantenwechsel. Basis ansteuern bei Energie &lt; 1000.
       Beschädigtes System? <code>REP</code> repariert es sofort – kostet Energie und löst Gegenangriff aus.
       Scotty entführt? Nächsten Klingonen-Quadrant ansteuern und alle vernichten.
-      <strong>Zeit läuft nur beim Fliegen ab</strong> – schießen, scannen, reparieren kostet keine Zeit.
+      Schilde <strong>vor</strong> dem Einflug hochfahren: Jede Kampfaktion (auch <code>SHE</code>) gibt dem Gegner einen Zug.
+      Scannen und der Computer kosten keine Zeit.
     </blockquote>
     <hr>
 
@@ -390,7 +391,7 @@
       </tbody>
     </table>
 
-    <p><strong>Ziel:</strong> Alle Klingonen <strong>und</strong> romulanischen Warbirds vernichten, bevor die Zeit abläuft.</p>
+    <p><strong>Ziel:</strong> Alle Klingonen vernichten, bevor die Zeit abläuft. Romulaner sind eine zusätzliche Gefahr, aber nicht Teil des Auftrags.</p>
 
     <!-- BEFEHLE ÜBERSICHT -->
     <h2 id="befehle">Befehle</h2>
@@ -602,7 +603,7 @@ FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
     <p>Mr. Spock verfällt dem Pon Farr. Dr. McCoy sperrt ihn in den Quartieren ein – aber vorher hat Spock noch schnell den <strong>Bibliothekscomputer auf vulkanische Lyrik umgestellt</strong>.</p>
     <ul>
       <li>Der <code>COM</code>-Befehl ist für ca. <strong>3 Sterndaten</strong> nicht verfügbar</li>
-      <li>Repariert sich automatisch beim Reisen (+1.0 pro Warpsprung)</li>
+      <li>Repariert sich mit der Zeit von selbst (um jedes vergangene Sterndatum)</li>
     </ul>
 
     <h4>Scotty-Entführung (Klingonen)</h4>
@@ -650,36 +651,30 @@ FEINDE NUTZEN DIE ABLENKUNG ZUM ANGRIFF!</pre>
     </table>
     <p><strong>Drei Wege zur Reparatur:</strong></p>
     <ol>
-      <li><strong>Automatisch beim Reisen</strong> – Bei jedem Warpsprung werden alle beschädigten Systeme um den Warpfaktor (mind. 1.0) repariert.</li>
+      <li><strong>Mit der Zeit</strong> – Jede vergangene Zeit repariert alle beschädigten Systeme um denselben Betrag: ein Flug um bis zu 1.0, jede Kampfaktion um 0.1.</li>
       <li><strong>Sternenbase (<code>DAM</code>)</strong> – Angedockt können Techniker alle Schäden auf einmal beheben. Kostet Stardates, keine Energie.</li>
       <li><strong>Notfallreparatur (<code>REP</code>)</strong> – Einzelnes System sofort reparieren, überall. Kostet viel Energie und löst einen Gegenangriff aus.</li>
     </ol>
 
     <!-- ZEIT & RUNDEN -->
     <h2 id="zeitrunden">Zeit &amp; Runden</h2>
-    <p>Es gibt <strong>keine festen Runden</strong>. Das Spiel läuft über ein <strong>Sterndatum-Zeitlimit</strong> – nur bestimmte Aktionen verbrauchen Zeit.</p>
-    <h4>Was Zeit kostet (Sterndatum steigt):</h4>
+    <p>Das Spiel läuft über ein <strong>Sterndatum-Zeitlimit</strong>. Jede Aktion gehört zu einer von drei Arten:</p>
     <table>
-      <thead><tr><th>Aktion</th><th>Kosten</th></tr></thead>
+      <thead><tr><th>Art</th><th>Befehle</th><th>Zeit</th><th>Gegner am Zug?</th></tr></thead>
       <tbody>
-        <tr><td>NAV innerhalb eines Quadranten</td><td>+Warpfaktor (mind. 1.0)</td></tr>
-        <tr><td>NAV über Quadrantengrenze</td><td>+1.0 zusätzlich</td></tr>
-        <tr><td>DAM-Reparatur an Basis</td><td>+0.1–1.0 je nach Schäden</td></tr>
+        <tr><td>Information</td><td><code>SRS</code>, <code>LRS</code>, <code>DAM</code>-Bericht, <code>COM</code></td><td>keine</td><td>Nein</td></tr>
+        <tr><td>Kampfaktion</td><td><code>SHE</code>, <code>PHA</code>, <code>TOR</code>, <code>TAC</code>, <code>TRB</code>, <code>REP</code></td><td>+0.1</td><td>Ja – <strong>nach</strong> der Aktion</td></tr>
+        <tr><td>Bewegung</td><td><code>NAV</code></td><td>+Warpfaktor, höchstens 1.0 (auch über Quadrantengrenzen)</td><td>Ja – <strong>vor</strong> der Bewegung; Klingonen repositionieren sich</td></tr>
+        <tr><td>Werft</td><td><code>DAM</code>-Reparatur angedockt</td><td>+0.1–1.2 je nach Schäden</td><td>Nein</td></tr>
       </tbody>
     </table>
-    <p><strong>Was keine Zeit kostet:</strong> SRS, LRS, PHA, TOR, SHE, REP, COM, TAC, TRB.</p>
-    <h4>Wann Gegner angreifen:</h4>
-    <table>
-      <thead><tr><th>Aktion</th><th>Gegenangriff?</th></tr></thead>
-      <tbody>
-        <tr><td><code>NAV</code> – Bewegen</td><td>Ja – Klingonen repositionieren sich, dann greifen alle an</td></tr>
-        <tr><td><code>PHA</code> – Phaser</td><td>Ja – nach dem Schuss</td></tr>
-        <tr><td><code>TOR</code> – Torpedo</td><td>Ja – nach Einschlag</td></tr>
-        <tr><td><code>REP</code> – Notfallreparatur</td><td>Ja – Feinde nutzen die Ablenkung</td></tr>
-        <tr><td>SRS, LRS, SHE, DAM, COM, TAC, TRB</td><td>Nein</td></tr>
-      </tbody>
-    </table>
-    <blockquote>Du kannst beliebig oft <code>SRS</code>, <code>LRS</code>, <code>SHE</code> oder <code>DAM</code> nutzen, ohne dass Feinde reagieren. Nur Bewegung und Waffeneinsatz (sowie <code>REP</code>) lösen Gegenangriffe aus.</blockquote>
+    <ul>
+      <li>Abgebrochene oder ungültige Eingaben kosten weder Zeit noch Zug.</li>
+      <li><strong>Zeit heilt:</strong> Beschädigte Systeme reparieren sich mit jeder vergangenen Zeit um denselben Betrag.</li>
+      <li>Beim Einflug in einen Quadranten hat der Captain den ersten Zug. Wer dann erst die Schilde hochfahren muss, gibt dem Gegner damit den ersten Schuss.</li>
+      <li>Angedockt schützen die Schilde der Sternenbasis vor jedem Angriff.</li>
+    </ul>
+    <blockquote>Schilde also <strong>vor</strong> dem Sprung in einen Feindquadranten setzen – dann kannst du nach dem Einflug sofort feuern.</blockquote>
 
     <!-- STRATEGIE -->
     <h2 id="strategie">Schnellstart-Strategie</h2>
