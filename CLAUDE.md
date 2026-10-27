@@ -7,8 +7,8 @@
 HTML5/JavaScript-Port von **Super Star Trek** (Original BASIC 1978, Mike Mayfield / Dave Ahl).
 Portierungskette: BASIC → Lua (Emanuele Bolognesi, 2020) → Python → **HTML5/JS (2026, führend)**.
 
-Einzige Klasse: `Game` in `superstartrek.html` (~2500 Zeilen Inline-JS).
-GUI: grafische **LCARS-Brücke** (CSS-Grid + Inline-SVG, siehe `GUI-PLAN.md`).
+Einzige Klasse: `Game` in `superstartrek.html` (~2350 Zeilen, Inline-JS).
+GUI: klassische **ASCII-Brücke** im grünen Terminal-Look. Die frühere LCARS-GUI liegt im Branch `lcars-legacy`.
 
 ## Starten
 
@@ -29,8 +29,8 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 | Datei | Zweck |
 |-------|-------|
 | `superstartrek.html` | **Gesamtes Spiel** (HTML + CSS + JS, Single File) |
-| `HANDBUCH.md` | Spielanleitung auf Deutsch |
-| `GUI-PLAN.md` | Konzept + Umsetzungsplan der LCARS-GUI |
+| `HANDBUCH.html` | Spielanleitung auf Deutsch |
+| `EVENTS.md` | Konzept der Sonderereignisse |
 | `CLAUDE.md` | Diese Datei |
 | `legacy/superstartrek.py` | Python-Vorgängerversion (Referenz) |
 | `legacy/_test_events.py` | Python-Ereignistests (Referenz) |
@@ -44,14 +44,10 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 - Quadranten-String: `quadString` = 192 Zeichen (8×8 Sektoren × 3 Zeichen).
 - `galaxy[i][j]` kodiert: `klingons*1000 + romulans*100 + starbases*10 + stars`.
 - I/O über `telePrint()` (schreibt in `#terminal`) und `ask()` (Promise-basiert).
-- Layout (LCARS-Grid `#lcars`): Kopfzeile (`#top`) + Befehls-Buttons (`#side`) +
-  SVG-Hauptschirm (`#srs` im `#screen-frame`) + Statuspanel (`#stat`) + Terminal (`#term-panel`).
-- **Präsentationsschicht getrennt von der Logik**: `renderBridge(game)` liest den Spielzustand
-  (`quadString`, `energyLevel`, `damageLevel`, `exploredSpace`, …) und rendert Karte + Status.
-  `FX.phaser()/torpedoAt()/boom()/shake()` = Waffen-Animationen auf dem SVG (Hooks in den
-  4 Waffen-/Angriffsmethoden). Sprites als SVG-`<symbol>` (`#sym-ent`, `#sym-kli`, …).
-- Befehls-Buttons senden über `submitInput()` durch das normale `ask()`-Promise;
-  aktiv nur bei `BEFEHL?`-Prompt (Body-Klasse `cmd-mode`).
+- Layout: feste ASCII-Brücke `#bridge` (oben) + scrollendes `#terminal` + Eingabezeile `#input-row`.
+  `shortRangeSensorScan()` rendert die Brücke neu: Sektorkarte, Statuswerte, `_enterpriseSchematic()`
+  (Schilde + Geräteschäden) und Crew-Leiste. Reine Tastatureingabe.
+- Sound: `beep()` (Rechteckton) und `SFX.phaser()/torpedo()/boom()/warp()` (Web Audio, ohne Samples).
 - Farben: `safeHtml()` (Token → PUA-Escaping → `<span>`) + `colorMsg()` (Nachrichtenklassen) im Terminal-Log.
 
 ## Wichtige Methoden (Auswahl)
@@ -60,17 +56,18 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
 |---------|-----------|
 | `_initGalaxy()` | Galaxis zufällig befüllen |
 | `_checkSpecialEvents()` | Harry Mudd, Vulkan-Schiff, Händler, Tribbles |
-| `_klingonsAttack()` / `_romulansAttack()` | Angriffe der Gegner |
-| `shortRangeSensorScan()` | SRS → ruft `renderBridge()` (grafisches HUD) |
+| `_klingonsAttack()` / `_romulansAttack()` | Angriffe der Gegner (gemeinsamer Treffer: `_takeHit()`) |
+| `shortRangeSensorScan()` | SRS → zeichnet die ASCII-Brücke `#bridge` |
 | `firePhasers()` / `firePhotonTorpedoes()` | Waffen |
-| `courseControl()` / `impulseEngines()` | Bewegung |
+| `courseControl()` | Bewegung (NAV) |
 | `tachyonScan()` | Getarnte Romulaner aufspüren |
 | `beamTribbles()` | Tribbles auf Klingonenschiff beamen |
 
 ## Konventionen
 
 - Koordinaten: `q1/q2` = Quadrant (row/col), `s1/s2` = Sektor (row/col), 1-basiert.
-- Geräteschäden: `damageLevel[1..8]` – positiv = beschädigt, negativ = repariert.
+- Geräteschäden: `damageLevel[1..8]` – negativ = beschädigt, ≥ 0 = funktionsfähig.
 - Sonderereignis-Quadranten (`harryMuddQuadrant` etc.) werden auf `[0,0]` gesetzt wenn verbraucht.
 - Klingonen: `k[1..3]`, Romulaner: `r[1..2]` jeweils `[row, col, energy, ...]`.
+- Nach Änderungen an `k3/r3/b3/s3` den Galaxis-Eintrag mit `_updateQuadrantRecord()` nachziehen.
 - Sprache: gesamte UI auf **Deutsch** (Befehle, Meldungen, Status).
