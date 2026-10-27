@@ -372,6 +372,7 @@
     <h2 id="starten">Starten</h2>
     <p><code>superstartrek.html</code> im Browser öffnen – kein Server, keine Installation nötig.</p>
     <p>Einfach die Datei doppelklicken oder per Drag&nbsp;&amp;&nbsp;Drop in Chrome / Firefox / Edge ziehen.</p>
+    <p>Das Spiel ist für Desktop-Computer mit Tastatur gedacht. Auf Bildschirmen unter 768&nbsp;px Breite (Handy) erscheint nur ein Hinweis. Mit <code>↑</code>/<code>↓</code> blätterst du durch frühere Eingaben.</p>
     <blockquote>Die Python-Ursprungsversion liegt unter <code>legacy/superstartrek.py</code> (nur als Referenz).</blockquote>
 
     <!-- UNIVERSUM -->
@@ -415,12 +416,10 @@
     <p>Bewegt die Enterprise. Kurs 1–8 (oder 9 = 1), Warp 0.1–8.<br>
     Warp 1 = eine Quadrantenlänge. Je schneller, desto mehr Energie.</p>
 
-    <pre>Kurssystem:
+    <pre>Kurssystem (steht dauerhaft auf der Brücke unter der Karte):
   4  3  2
    \ | /
-    \|/
-5 ---*--- 1
-    /|\
+ 5 --*-- 1
    / | \
   6  7  8</pre>
 
@@ -428,7 +427,13 @@
 
     <!-- SRS -->
     <h3 id="srs"><code>SRS</code> – Kurzstrecken-Scan</h3>
-    <p>Zeigt den aktuellen Quadranten + Statusleiste: Energie, Schilde, Torpedos, Sterndatum, Zustand.</p>
+    <p>Zeichnet die Brücke oben im Fenster neu (das passiert auch automatisch nach jeder Aktion):</p>
+    <ul>
+      <li><strong>Sektorkarte</strong> des aktuellen Quadranten, Name und Koordinaten stehen im Rahmen. Leere Sektoren sind als <code>.</code> markiert.</li>
+      <li><strong>Status:</strong> Sterndatum, Restzeit (gelb unter 5, rot unter 2 Tagen), Zustand, Quadrant, Sektor, Torpedos, Energie, Schilde, verbleibende Klingonen.</li>
+      <li><strong>Enterprise-Schema:</strong> Rumpf cyan = Schilde aktiv, Gondeln rot = Warpantrieb beschädigt. Darunter jedes System als <code>OK</code> oder rot <code>--</code>.</li>
+      <li>Der <strong>Rahmen</strong> färbt sich bei ROTER ALARM rot und beim Andocken cyan.</li>
+    </ul>
     <p><strong>Zustand (CONDITION):</strong></p>
     <p>
       <span class="cond cond-green">GRÜN</span> &nbsp;– alles normal &nbsp;&nbsp;
@@ -441,15 +446,15 @@
     <h3 id="lrs"><code>LRS</code> – Langstrecken-Scan</h3>
     <p>Zeigt die 3×3 Quadranten um die Enterprise herum. Format: <code>KBS</code> (K = Klingonen, B = Basen, S = Sterne).<br>
     <code>207</code> bedeutet: 2 Klingonen, keine Basis, 7 Sterne.</p>
-    <pre>LANGSTRECKEN-SCAN FÜR QUADRANT 2,4
+    <pre>LANGSTRECKENSCAN FÜR QUADRANT 2,4
 -------------------
 : *** : 003 : 104 :
 -------------------
-: 002 : 006 : 207 :
+: 002 :[006]: 207 :
 -------------------
 : *** : 011 : 001 :
 -------------------</pre>
-    <p>Die Enterprise steht in der Mitte (<code>006</code> = kein Klingone, keine Basis, 6 Sterne). Rechts oben (<code>104</code>) lauern 1 Klingone und eine Basis.</p>
+    <p>Die Enterprise steht in der Mitte, markiert mit <code>[ ]</code> (<code>006</code> = kein Klingone, keine Basis, 6 Sterne). Rechts oben (<code>104</code>) lauern 1 Klingone und eine Basis. Klingonen-Ziffern erscheinen rot, Basen grün.</p>
 
     <!-- PHA -->
     <h3 id="pha"><code>PHA</code> – Phaser</h3>
@@ -481,14 +486,14 @@ BERICHT DER DEFLEKTOR-SCHALTSTELLE:
     <h3 id="dam"><code>DAM</code> – Schadenskontrolle</h3>
     <p>Zeigt den Zustand aller 8 Bordsysteme. Negative Werte = beschädigt, 0.0 = intakt.</p>
     <pre>GERÄT                   REPARATURZUSTAND
-WARPANTRIEB                      0.0
-KURZSTRECKENSENSOREN             0.0
-LANGSTRECKENSENSOREN             0.0
-PHASER-STEUERUNG                 0.0
-PHOTONENRÖHREN                  -2.4
-SCHADENSKONTROLLE                0.0
-SCHILDSTEUERUNG                  0.0
-BIBLIOTHEKSCOMPUTER              0.0</pre>
+WARPANTRIEB                  0.0
+KURZSTRECKENSENSOREN         0.0
+LANGSTRECKENSENSOREN         0.0
+PHASER-STEUERUNG             0.0
+PHOTONENRÖHREN              -2.4
+SCHADENSKONTROLLE            0.0
+SCHILDSTEUERUNG              0.0
+BIBLIOTHEKSCOMPUTER          0.0</pre>
     <p>Beim Andocken an einer Basis können Techniker <strong>alle Schäden auf einmal</strong> beheben – kostet Stardates, keine Energie:</p>
     <pre>TECHNIKER BEREIT FÜR REPARATURARBEITEN AN IHREM SCHIFF;
 GESCHÄTZTE REPARATURZEIT: 0.3 STERNDATEN

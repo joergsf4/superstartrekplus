@@ -10,8 +10,9 @@
 body {
   background: #000;
   color: #00dd00;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 14px;
+  font-family: Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace;
+  /* Brücke (~110 Spalten) passt ohne horizontales Scrollen in jedes Desktop-Fenster */
+  font-size: clamp(10px, calc((100vw - 24px) / 69), 16px);
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -23,23 +24,22 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: calc(112ch + 16px);   /* + Padding */
+  margin: 0 auto;
   padding: 8px;
 }
 
 #bridge {
   flex-shrink: 0;
   white-space: pre;
-  line-height: 1.4;
-  padding: 0 2px 4px;
-  border-bottom: 1px solid #005500;
+  line-height: 1.2;
   padding-bottom: 6px;
   margin-bottom: 2px;
-  overflow-x: auto;
 }
-
-#bridge::-webkit-scrollbar { height: 4px; }
-#bridge::-webkit-scrollbar-track { background: #0a0a0a; }
-#bridge::-webkit-scrollbar-thumb { background: #004400; border-radius: 2px; }
+#bridge:empty { display: none; }   /* bis zum ersten SRS */
+#bridge.alarm  .frame { color: #ff2020; }
+#bridge.docked .frame { color: #44ddff; }
 
 #terminal {
   flex: 1;
@@ -70,6 +70,16 @@ body {
 }
 
 #prompt-text { white-space: pre; }
+
+.echo     { color: #66ff88; font-weight: bold; }
+.cmd-echo { margin-top: 0.7em; }
+.dot      { color: #006600; }
+
+#desktop-only { display: none; margin: auto; padding: 16px; white-space: pre; line-height: 1.3; }
+@media (max-width: 767px) {
+  #wrap { display: none; }
+  #desktop-only { display: block; font-size: 13px; }
+}
 
 #cmd {
   flex: 1;
@@ -105,20 +115,11 @@ body {
 .m-rom  { color: #ff66ff; }
 
 /* Hauptschirm – Enterprise-Ansicht */
-.ent-title  { color: #88ccff; font-weight: bold; }
 .ent-hull   { color: #00cc44; }
 .ent-shield { color: #40ddff; text-shadow: 0 0 5px #1597c4; }
 .ent-dmg    { color: #ff3030; font-weight: bold; text-shadow: 0 0 5px #b00000; }
 .ent-ok     { color: #44ff44; }
 .ent-off    { color: #557766; }
-/* Status-LED: exakt eine Monospace-Zelle breit, Kreis via ::before */
-.ent-led { display: inline-block; width: 1ch; text-align: center; }
-.ent-led::before {
-  content: ''; display: inline-block;
-  width: 0.62em; height: 0.62em; border-radius: 50%;
-  background: currentColor; vertical-align: middle;
-  box-shadow: 0 0 4px currentColor;
-}
 
 .restart-btn {
   display: inline-block;
@@ -136,6 +137,17 @@ body {
 </style>
 </head>
 <body>
+<div id="desktop-only">+--------------------------------------+
+|                                      |
+|      S U P E R   S T A R   T R E K   |
+|                                      |
+|   DIESES SPIEL IST FÜR DESKTOP-      |
+|   COMPUTER MIT TASTATUR GEDACHT.     |
+|                                      |
+|   BITTE AUF EINEM GRÖSSEREN          |
+|   BILDSCHIRM ÖFFNEN.                 |
+|                                      |
++--------------------------------------+</div>
 <div id="wrap">
   <div id="bridge"></div>
   <div id="terminal" aria-live="polite" aria-label="Spielausgabe"></div>
@@ -224,10 +236,13 @@ function colorMsg(html) {
 }
 
 async function telePrint(text = '', delayMs = 60) {
+  await printHtml(colorMsg(safeHtml(String(text))), delayMs);
+}
+
+/** Wie telePrint, aber mit fertigem (bereits escaptem) HTML. */
+async function printHtml(html, delayMs = 60) {
   const div = document.createElement('div');
   div.className = 'line';
-  let html = safeHtml(String(text));
-  html = colorMsg(html);
   div.innerHTML = html || '&nbsp;';
   $term.appendChild(div);
   $term.scrollTop = $term.scrollHeight;
@@ -243,11 +258,22 @@ async function ask(promptText = '') {
   return new Promise(resolve => { _resolveInput = resolve; });
 }
 
+const _history = [];
+let _histPos = 0;
+
 $cmd.addEventListener('keydown', e => {
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && _history.length) {
+    e.preventDefault();
+    _histPos = Math.max(0, Math.min(_history.length, _histPos + (e.key === 'ArrowUp' ? -1 : 1)));
+    $cmd.value = _history[_histPos] || '';
+    return;
+  }
   if (e.key !== 'Enter' || !_resolveInput) return;
   const val    = $cmd.value.trim();
+  if (val && val !== _history[_history.length - 1]) _history.push(val);
+  _histPos = _history.length;
   const echoed = document.createElement('div');
-  echoed.className  = 'line';
+  echoed.className  = /^BEFEHL/.test($prompt.textContent) ? 'line echo cmd-echo' : 'line echo';
   echoed.textContent = $prompt.textContent + val;
   $term.appendChild(echoed);
   $term.scrollTop = $term.scrollHeight;
@@ -255,6 +281,11 @@ $cmd.addEventListener('keydown', e => {
   const fn = _resolveInput;
   _resolveInput = null;
   fn(val);
+});
+
+// Klick ins Fenster fokussiert die Eingabe – außer beim Markieren von Text
+document.addEventListener('mouseup', () => {
+  if (_resolveInput && !String(window.getSelection())) $cmd.focus();
 });
 
 function clearScreen() {
@@ -721,23 +752,7 @@ class Game {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ANZEIGE – Kompassrose
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  async _showDirections() {
-    await telePrint('');
-    await telePrint('      4  3  2   ');
-    await telePrint('       \\ | /    ');
-    await telePrint('        \\|/     ');
-    await telePrint('    5 ---*--- 1 ');
-    await telePrint('        /|\\     ');
-    await telePrint('       / | \\    ');
-    await telePrint('      6  7  8   ');
-    await telePrint('');
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // KURZSTRECKENSCAN (SRS)
+  // KURZSTRECKENSCAN (SRS) – zeichnet die feste ASCII-Brücke
   // ═══════════════════════════════════════════════════════════════════════════
 
   async shortRangeSensorScan() {
@@ -745,100 +760,69 @@ class Game {
     const srsOk = this.damageLevel[2] >= 0;
     if (!srsOk) await telePrint('*** KURZSTRECKENSENSOREN AUSGEFALLEN ***');
 
-    // 8 Zeilen × 8 Zellen × (3 Zeichen + 1 Leerzeichen) = 32 Zeichen
-    const grid = [];
+    // Jede Spalte besteht aus Zeilen {vis, html}: vis = sichtbarer Text (bestimmt die Breite)
+    const cell  = (vis, html = colorMsg(safeHtml(vis))) => ({ vis, html });
+    const blank = (w) => ' '.repeat(w);
+
+    // ── Spalte 1: Sektorkarte (leere Sektoren als gedimmter Punkt) + Kompassrose ──
+    const MAP_W = 34;   // Zeilennummer (2) + 8 Sektoren × 4 Zeichen
+    const map = [cell(srsOk ? '   ' + [1, 2, 3, 4, 5, 6, 7, 8].join('   ') : '')];
     for (let i = 0; i < 8; i++) {
-      const b = i * 24;
-      let row = '';
-      for (let j = 0; j < 8; j++) row += this.quadString.slice(b + j*3, b + j*3 + 3) + ' ';
-      grid.push(row); // 32 Zeichen
-    }
-
-    const cond  = this.shipCondition;
-    const VS_W  = 34;   // Viewscreen-Innenbreite (2 für Zeilennummer + 32 Gitter)
-    const ST_W  = 23;   // Statusspaltenbreite (mind. 23 für "ROTER ALARM")
-
-    const st = [
-      `STERNDATUM  ${this._roundTo(this.stardate, 1)}`,
-      `ZUSTAND     ${cond}`,
-      `QUADRANT    ${this.q1} , ${this.q2}`,
-      `SEKTOR      ${Math.floor(this.s1)} , ${Math.floor(this.s2)}`,
-      `TORPEDOS    ${Math.floor(this.photonTorpedoes)}`,
-      `ENERGIE     ${Math.floor(this.energyLevel)}`,
-      `SCHILDE     ${Math.floor(this.shieldLevel)}`,
-      `KLINGONEN   ${Math.floor(this.totalKlingonShips)}`,
-    ];
-
-    const H = '═', V = '║',
-          TL = '╔', TR = '╗', BL = '╚', BR = '╝';
-
-    // ── Spalte 1: Kurzstrecken-Viewscreen (Karte) ──
-    const WMAP = 1 + 1 + VS_W + 1;   // Leerzeichen + ║ + Viewscreen + ║
-    const panelMap = [{ vis: ' ' + TL + H.repeat(VS_W) + TR }];
-    if (srsOk) {
-      // Beschriftete Karte: Spaltenkopf 1–8 + 8 Gitterzeilen mit Zeilennummer
-      const colHeaderArr = Array(VS_W).fill(' ');
-      for (let j = 0; j < 8; j++) colHeaderArr[4 * j + 3] = String(j + 1);
-      const vsInner = [colHeaderArr.join('')];
-      for (let i = 0; i < 8; i++) vsInner.push((i + 1) + ' ' + grid[i]);
-      for (const line of vsInner) panelMap.push({ vis: ' ' + V + line + V });
-    } else {
-      // Sensoren ausgefallen: nur diese Karte ausblenden, restliche Brücke bleibt
-      for (let r = 0; r < 9; r++) {
-        const s  = r === 3 ? 'KURZSTRECKENSENSOREN' : r === 5 ? 'AUSGEFALLEN' : '';
-        const lp = Math.floor((VS_W - s.length) / 2), rp = VS_W - lp - s.length;
-        panelMap.push(s
-          ? { vis:  ' ' + V + ' '.repeat(lp) + s + ' '.repeat(rp) + V,
-              html: ' ' + V + ' '.repeat(lp) + `<span class="c-red">${s}</span>` + ' '.repeat(rp) + V }
-          : { vis:  ' ' + V + ' '.repeat(VS_W) + V });
+      if (!srsOk) {
+        const s  = i === 3 ? 'KURZSTRECKENSENSOREN' : i === 5 ? 'AUSGEFALLEN' : '';
+        const lp = Math.floor((MAP_W - s.length) / 2);
+        map.push(cell(blank(lp) + s, blank(lp) + `<span class="c-red">${s}</span>`));
+        continue;
       }
+      let row = `${i + 1} `;
+      for (let j = 0; j < 8; j++) {
+        const c = this.quadString.slice(i * 24 + j * 3, i * 24 + j * 3 + 3);
+        row += (c === '   ' ? ' . ' : c) + ' ';
+      }
+      map.push(cell(row, colorMsg(safeHtml(row)).split(' . ').join('<span class="dot"> . </span>')));
     }
-    panelMap.push({ vis: ' ' + BL + H.repeat(VS_W) + BR });
+    // Kompassrose, Mittelpunkt unter der Kartenmitte (Spalte 18)
+    map.push(cell(''));
+    for (const [off, s] of [[3, '4  3  2'], [2, '\\ | /'], [4, '5 --*-- 1'], [2, '/ | \\'], [3, '6  7  8']])
+      map.push(cell(blank(18 - off) + s));
 
-    // ── Spalte 2: Statuswerte ──
-    const WSTAT = ST_W;
-    const panelStat = st.map(s => ({ vis: this._formatWithSpaces(s, ST_W) }));
-
-    // ── Spalte 3: schematische Enterprise rechts neben dem Schirm ──
-    const ship  = this._enterpriseSchematic();
-    const WSHIP = ship.width;
-
-    // Gesamt-Innenbreite der Brücken-Box aus den drei Spalten
-    const GAP   = 3;
-    const INNER = WMAP + GAP + WSTAT + GAP + WSHIP + 1;  // +1 = rechter Rand
-
-    // Senkrechte Ausrichtung: Status ab erster Gitterzeile, Schiff oben bündig
-    const STAT_OFFSET = 2;
-    const N = Math.max(panelMap.length, STAT_OFFSET + panelStat.length, ship.lines.length);
-
-    const blank    = (w) => ' '.repeat(w);
-    const cellHtml = (panel, w) =>
-      !panel ? blank(w) : (panel.html != null ? panel.html : colorMsg(safeHtml(panel.vis)));
-
-    const gap = blank(GAP);
-    const htmlLines = [colorMsg(safeHtml(TL + H.repeat(INNER) + TR))];
-    for (let i = 0; i < N; i++) {
-      const html =
-        cellHtml(panelMap[i], WMAP) + gap +
-        cellHtml(panelStat[i - STAT_OFFSET], WSTAT) + gap +
-        cellHtml(ship.lines[i], WSHIP);
-      htmlLines.push(V + html + ' ' + V);
-    }
-
-    // ── Brückencrew zentriert unter den Spalten ──
-    const crew = [
-      '╔═══╗    ╔═══╗    ╔══════════╗    ╔═══╗    ╔═══╗',
-      '║CHK║    ║SLU║    ║   KIRK   ║    ║UHR║    ║SPK║',
+    // ── Spalte 2: Statuswerte (ab der ersten Kartenzeile) ──
+    const ST_W = 23;
+    const left = this.t0 + this.maxNumOfDays - this.stardate;
+    const leftTxt = `${this._roundTo(left, 1)} TAGE`;
+    const leftCls = left < 2 ? 'c-red' : left < 5 ? 'c-yel' : null;
+    const stat = [
+      cell(''),
+      cell(`STERNDATUM  ${this._roundTo(this.stardate, 1)}`),
+      cell(`RESTZEIT    ${leftTxt}`, 'RESTZEIT    ' + (leftCls ? `<span class="${leftCls}">${leftTxt}</span>` : leftTxt)),
+      cell(`ZUSTAND     ${this.shipCondition}`),
+      cell(`QUADRANT    ${this.q1} , ${this.q2}`),
+      cell(`SEKTOR      ${Math.floor(this.s1)} , ${Math.floor(this.s2)}`),
+      cell(`TORPEDOS    ${Math.floor(this.photonTorpedoes)}`),
+      cell(`ENERGIE     ${Math.floor(this.energyLevel)}`),
+      cell(`SCHILDE     ${Math.floor(this.shieldLevel)}`),
+      cell(`KLINGONEN   ${Math.floor(this.totalKlingonShips)}`),
     ];
-    htmlLines.push(V + blank(INNER) + V);
-    for (const c of crew) {
-      const lp = Math.floor((INNER - c.length) / 2);
-      htmlLines.push(V + colorMsg(safeHtml(blank(lp) + c + blank(INNER - lp - c.length))) + V);
-    }
-    htmlLines.push(colorMsg(safeHtml(BL + H.repeat(INNER) + BR)));
 
-    // Render in-place into the fixed bridge HUD
-    $bridge.innerHTML = htmlLines.join('\n');
+    // ── Spalte 3: schematische Enterprise mit Schilden und Systemzustand ──
+    const ship  = this._enterpriseSchematic();
+    const GAP   = 3;
+    const INNER = 1 + MAP_W + GAP + ST_W + GAP + ship.width + 1;
+    const col   = (c, w) => c ? c.html + blank(w - c.vis.length) : blank(w);
+    const frame = (s) => `<span class="frame">${safeHtml(s)}</span>`;
+
+    const title = `-- ${this._getQuadrantName(this.q1, this.q2)} (${this.q1},${this.q2}) `;
+    const lines = [frame('+' + title + '-'.repeat(INNER - title.length) + '+')];
+    const N = Math.max(map.length, stat.length, ship.lines.length);
+    for (let i = 0; i < N; i++) {
+      lines.push(frame('|') + ' ' + col(map[i], MAP_W) + blank(GAP) + col(stat[i], ST_W) +
+                 blank(GAP) + col(ship.lines[i], ship.width) + ' ' + frame('|'));
+    }
+    lines.push(frame('+' + '-'.repeat(INNER) + '+'));
+
+    $bridge.className = this.shipCondition === 'ROTER ALARM' ? 'alarm'
+                      : this.shipCondition === 'ANGEDOCKT' ? 'docked' : '';
+    $bridge.innerHTML = lines.join('\n');
     return srsOk;
   }
 
@@ -851,7 +835,7 @@ class Game {
    * ({ lines: [{vis, html}], width }) zur Platzierung rechts neben dem Schirm.
    *  - Warpgondeln werden rot, wenn der Warpantrieb (Gerät 1) beschädigt ist.
    *  - Bei aktiven Schilden (shieldLevel > 0) leuchtet der Schiffsrumpf cyan.
-   *  - Zwei Zeilen zeigen die Gerätenamen grün (OK) bzw. rot (beschädigt).
+   *  - Zwei Zeilen zeigen jedes Gerät als "NAME OK" (grün) bzw. "NAME --" (rot).
    */
   _enterpriseSchematic() {
     const warpDmg   = this.damageLevel[1] < 0;
@@ -882,16 +866,14 @@ class Game {
     };
     const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    // Systemschäden: Gerätename grün = OK, rot = beschädigt (alle 8 Geräte)
+    // Systemschäden: "NAME OK" grün bzw. "NAME --" rot (alle 8 Geräte)
     const row1 = [['WARP', 1], ['SRS', 2], ['LRS', 3], ['PHASER', 4]];
     const row2 = [['TORPEDO', 5], ['REP', 6], ['SCHILD', 7], ['COMPUTER', 8]];
     const ISEP = '  ';
-    // 'o' im vis-Text = Platzhalter für die LED-Bubble (genau eine Zelle breit)
-    const indVis  = (row) => row.map(([n]) => n + ' o').join(ISEP);
-    const indHtml = (row) => row.map(([n, d]) => {
-      const cls = this.damageLevel[d] < 0 ? 'ent-dmg' : 'ent-ok';
-      return `<span class="${cls}">${esc(n)}</span> <span class="ent-led ${cls}"></span>`;
-    }).join(ISEP);
+    const ind     = (n, d) => n + (this.damageLevel[d] < 0 ? ' --' : ' OK');
+    const indVis  = (row) => row.map(([n, d]) => ind(n, d)).join(ISEP);
+    const indHtml = (row) => row.map(([n, d]) =>
+      `<span class="${this.damageLevel[d] < 0 ? 'ent-dmg' : 'ent-ok'}">${ind(n, d)}</span>`).join(ISEP);
 
     const slVis = shieldsUp ? 'SCHILDE: AKTIV' : 'SCHILDE: INAKTIV';
     const width = Math.max(artW, slVis.length, indVis(row1).length, indVis(row2).length);
@@ -956,30 +938,24 @@ class Game {
     await telePrint(sep);
 
     for (let i = this.q1 - 1; i <= this.q1 + 1; i++) {
-      const n = [-1, -2, -3];
+      let row = '';
       for (let j = this.q2 - 1; j <= this.q2 + 1; j++) {
-        const idx = j - (this.q2 - 1);
-        if (i >= 1 && i <= 8 && j >= 1 && j <= 8) {
-          n[idx] = this.galaxy[i][j];
-          this.exploredSpace[i][j] = this.galaxy[i][j];
-        }
+        const inside = i >= 1 && i <= 8 && j >= 1 && j <= 8;
+        if (inside) this.exploredSpace[i][j] = this.galaxy[i][j];
+        const own = i === this.q1 && j === this.q2;
+        row += (own ? ':[' : ': ') + (inside ? this._kbsHtml(this.galaxy[i][j]) : '***') + (own ? ']' : ' ');
       }
-      let rowStr = '';
-      for (const val of n) {
-        rowStr += ': ';
-        if (val < 0) {
-          rowStr += '*** ';
-        } else {
-          // Romulaner (Hunderterstelle) ausblenden: Tarnvorrichtungen entziehen sie
-          // den Langstreckensensoren — Anzeige klassisch KBS (Issue #3)
-          const masked = Math.floor(val / 1000) * 100 + (val % 100);
-          rowStr += String(masked + 1000).slice(1, 4) + ' ';
-        }
-      }
-      await telePrint(rowStr + ':');
+      await printHtml(row + ':');
       await telePrint(sep);
     }
     return true;
+  }
+
+  /** Quadranten-Eintrag als KBS-Ziffern (HTML): Klingonen rot, Basen grün. */
+  _kbsHtml(val) {
+    // Romulaner (Hunderterstelle) ausblenden: Tarnvorrichtungen entziehen sie den Sensoren (Issue #3)
+    const [k, b, st] = String(Math.floor(val / 1000) * 100 + (val % 100) + 1000).slice(1, 4);
+    return (k > 0 ? `<span class="k">${k}</span>` : k) + (b > 0 ? `<span class="sb">${b}</span>` : b) + st;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -996,7 +972,7 @@ class Game {
     } else if (units < 0 || this.shieldLevel === units) {
       await telePrint('<SCHILDE UNVERÄNDERT>');
     } else if (units > this.energyLevel + this.shieldLevel) {
-      await telePrint('SCHILDKONTROLLE MELDET: \'DAS IST NICHT DIE FÖRDERATION\'S SCHATZKAMMER.\'');
+      await telePrint('SCHILDKONTROLLE MELDET: \'DAS IST NICHT DIE FÖDERATION\'S SCHATZKAMMER.\'');
       await telePrint('<SCHILDE UNVERÄNDERT>');
     } else {
       this.energyLevel = this.energyLevel + this.shieldLevel - units;
@@ -1015,10 +991,9 @@ class Game {
     if (this.damageLevel[6] >= 0) {
       await telePrint('\nGERÄT                   REPARATURZUSTAND');
       for (let idx = 1; idx <= 8; idx++) {
-        await telePrint(
-          this._formatWithSpaces(Game.DEVICE_NAMES[idx], 27) +
-          this._roundTo(this.damageLevel[idx], 2)
-        );
+        const d = this.damageLevel[idx], v = d.toFixed(1).padStart(5);
+        await printHtml(safeHtml(this._formatWithSpaces(Game.DEVICE_NAMES[idx], 27)) +
+                        (d < 0 ? `<span class="c-red">${v}</span>` : v));
       }
     } else {
       await telePrint('SCHADENSBERICHT NICHT VERFÜGBAR');
@@ -1145,18 +1120,16 @@ class Game {
         const n1 = this._getQuadrantName(i, 1, true);
         const n2 = this._getQuadrantName(i, 5, true);
         row += '  ' + this._formatWithSpaces(n1, 23, true) + ' ' + this._formatWithSpaces(n2, 23, true);
+        await telePrint(row);
       } else {
+        // eigenes Quadrantenfeld in [ ] – die Klammern belegen die Leerzeichen daneben
         for (let j = 1; j <= 8; j++) {
-          row += '   ';
-          if (this.exploredSpace[i][j] === 0) { row += '***'; }
-          else {
-            // wie beim LRS: Romulaner-Stelle maskiert, KBS-Format (Issue #3)
-            const v = this.exploredSpace[i][j];
-            row += String(Math.floor(v / 1000) * 100 + (v % 100) + 1000).slice(1, 4);
-          }
+          const own = i === this.q1 && j === this.q2, prevOwn = i === this.q1 && j - 1 === this.q2;
+          row += (prevOwn ? ']' : ' ') + ' ' + (own ? '[' : ' ');
+          row += this.exploredSpace[i][j] === 0 ? '***' : this._kbsHtml(this.exploredSpace[i][j]);
         }
+        await printHtml(row + (i === this.q1 && this.q2 === 8 ? ']' : ''));
       }
-      await telePrint(row);
       await telePrint('     ----- ----- ----- ----- ----- ----- ----- -----');
     }
     await telePrint('');
@@ -1176,7 +1149,7 @@ class Game {
 
   async statusReport() {
     await telePrint('   STATUSBERICHT:');
-    const ks = this.totalKlingonShips === 1 ? '' : 'E';
+    const ks = this.totalKlingonShips === 1 ? 'E' : 'EN';
     await telePrint(`KLINGON${ks} VERBLIEBEN: ${this.totalKlingonShips}`);
     if (this.totalRomulanShips > 0)
       await telePrint('ROMULANISCHE AKTIVITÄT GEMELDET — ANZAHL UND POSITIONEN UNBEKANNT');
@@ -1186,7 +1159,7 @@ class Game {
       await telePrint('  -- SIE HABEN KEINE STERNENBASIS MEHR!');
     } else {
       const bs = this.totalStarbases > 1 ? 'STERNENBASEN' : 'STERNENBASIS';
-      await telePrint(`DIE FEDERATION UNTERHÄLT ${this.totalStarbases} ${bs} IN DER GALAXIS`);
+      await telePrint(`DIE FÖDERATION UNTERHÄLT ${this.totalStarbases} ${bs} IN DER GALAXIS`);
     }
     await this.damageControl();
     return true;
@@ -1250,7 +1223,7 @@ class Game {
     await telePrint('   2 = PHOTONENTORPEDO-DATEN');
     await telePrint('   3 = STERNENBASIS-NAVIGATIONSDATEN');
     await telePrint('   4 = KURS-/ENTFERNUNGSRECHNER');
-    await telePrint('   5 = GALAKISCHE REGIONSKARTE');
+    await telePrint('   5 = GALAKTISCHE REGIONSKARTE');
     await telePrint('   X = ZURÜCK ZUR BRÜCKE\n');
   }
 
@@ -1280,7 +1253,7 @@ class Game {
 
   async _enterpriseDestroyed() {
     beep(150, 200); beep(120, 200); beep(100, 800);
-    await telePrint('\nDIE ENTERPRISE WURDE VERNICHTET.  DIE FÖRDERATION WIRD EROBERT.');
+    await telePrint('\nDIE ENTERPRISE WURDE VERNICHTET.  DIE FÖDERATION WIRD EROBERT.');
     await sleep(1500);
   }
 
@@ -1297,7 +1270,7 @@ class Game {
   async _allEnemiesDefeatedAsync() {
     beep(523,150); beep(659,150); beep(784,150); beep(1047,400);
     await telePrint('\nGLÜCKWUNSCH, CAPTAIN! ALLE KLINGONISCHEN KRIEGSSCHIFFE WURDEN VERNICHTET.');
-    await telePrint(`DIE LETZTE BEDROHUNG DER FÖRDERATION WURDE AM STERNDATUM ${this._roundTo(this.stardate,1)} VERNICHTET`);
+    await telePrint(`DIE LETZTE BEDROHUNG DER FÖDERATION WURDE AM STERNDATUM ${this._roundTo(this.stardate,1)} VERNICHTET`);
     if (this.totalRomulanShips > 0)
       await telePrint('DIE VERBLIEBENEN ROMULANISCHEN WARBIRDS ZIEHEN SICH IN IHR TERRITORIUM ZURÜCK.');
     // Effizienz: vernichtete Schiffe — erlegte Romulaner zählen als Bonus
@@ -1309,7 +1282,7 @@ class Game {
   }
 
   async _timeExpired() {
-    await telePrint('\nZU SPÄT, CAPTAIN!  DIE FÖRDERATION WURDE EROBERT.');
+    await telePrint('\nZU SPÄT, CAPTAIN!  DIE FÖDERATION WURDE EROBERT.');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1400,9 +1373,7 @@ class Game {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async courseControl() {
-    await this._showDirections();
-
-    const courseStr = await ask('KURS (0-9): ');
+    const courseStr = await ask('KURS (1-9): ');
     const course = parseFloat(courseStr);
     if (isNaN(course) || course < 1 || course > 9) {
       await telePrint("   LT. SULU MELDET, 'FALSCHE KURSDATEN, SIR!'");
@@ -2131,26 +2102,26 @@ class Game {
       ANLEITUNG FÜR 'SUPER STAR TREK'
 
 1. WENN SIE 'BEFEHL?' SEHEN, GEBEN SIE EINEN DER GÜLTIGEN
-   BEFEHLE EIN: NAV, SRS, LRS, PHA, TOR, SHE, DAM, COM, TAC, TRB, XXX
+   BEFEHLE EIN: NAV, SRS, LRS, PHA, TOR, SHE, DAM, REP, COM, TAC, TRB, XXX
 
 2. BEI EINEM UNGÜLTIGEN BEFEHL ERSCHEINT DIE BEFEHLSLISTE.
 
 3. MANCHE BEFEHLE ERFORDERN EINGABEN (Z.B. NAV FRAGT NACH KURS).
    FALSCHE EINGABEN BRECHEN DEN BEFEHL AB.
 
-   DIE GALAXIS IST IN EIN 8×8 QUADRANTENNETZ EINGETEILT.
-JEDER QUADRANT IST NOCHMALS IN 8×8 SEKTOREN UNTERTEILT.
+   DIE GALAXIS IST IN EIN 8 X 8 QUADRANTENNETZ EINGETEILT.
+JEDER QUADRANT IST NOCHMALS IN 8 X 8 SEKTOREN UNTERTEILT.
 
    SIE ÜBERNEHMEN DAS KOMMANDO ÜBER DIE USS ENTERPRISE.
-IHR AUFTRAG: VERNICHTEN SIE ALLE KLINGONEN UND ROMULANISCHEN WARBIRDS.
+IHR AUFTRAG: VERNICHTEN SIE ALLE KLINGONISCHEN KRIEGSSCHIFFE.
 
    KLINGONEN SIND DIREKT UND AGGRESSIV.
-   ROMULANER SIND LISTIG: SIE BENUTZEN TARNVORRICHTUNGEN ({R})
-UND KÖNNEN NACH EINEM ANGRIFF VERSCHWINDEN.
+   ROMULANER SIND NICHT TEIL DES AUFTRAGS, ABER GEFÄHRLICH: SIE BENUTZEN
+TARNVORRICHTUNGEN ({R}) UND KÖNNEN NACH EINEM ANGRIFF VERSCHWINDEN.
 
    BENUTZEN SIE 'TAC' (TACHYON-SCAN, KOSTET 50 ENERGIE) UM GETARNTE
 ROMULANER ZU ENTDECKEN. PHASER UND TORPEDOS KÖNNEN GETARNTE SCHIFFE
-NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
+NICHT TREFFEN. LANGSTRECKENSENSOREN ERFASSEN ROMULANER ÜBERHAUPT NICHT.
 `;
     await telePrint(txt, 0);
     await ask('-- DRÜCKEN SIE ENTER UM FORTZUFAHREN ');
@@ -2161,14 +2132,22 @@ NICHT TREFFEN. LANGSTRECKENSENSOREN KÖNNEN IN ROMULANER-NÄHE UNGENAU SEIN.
   // ═══════════════════════════════════════════════════════════════════════════
 
   async run() {
-    // Enterprise ASCII-Art
+    // Titel + Enterprise ASCII-Art
     await telePrint('', 0);
-    await telePrint('                                    ,------*------,', 0);
-    await telePrint("                ,-------------   '---  ------'",     0);
-    await telePrint("                 '-------- --'      / /",             0);
-    await telePrint("                     ,---' '-------/ /--,",           0);
-    await telePrint("                      '----------------'",             0);
-    await telePrint('                DIE USS ENTERPRISE --- NCC-1701',      0);
+    for (const l of [
+      ' #### #   # ####  ##### ####      #### #####  ###  ####     ##### ####  ##### #   #',
+      '#     #   # #   # #     #   #    #       #   #   # #   #      #   #   # #     #  #',
+      ' ###  #   # ####  ####  ####      ###    #   ##### ####       #   ####  ####  ###',
+      '    # #   # #     #     #  #         #   #   #   # #  #       #   #  #  #     #  #',
+      '####   ###  #     ##### #   #    ####    #   #   # #   #      #   #   # ##### #   #',
+    ]) await telePrint('          ' + l, 0);
+    await telePrint('', 0);
+    await telePrint('                                                       ,------*------,', 0);
+    await telePrint("                                   ,-------------   '---  ------'",     0);
+    await telePrint("                                    '-------- --'      / /",             0);
+    await telePrint("                                        ,---' '-------/ /--,",           0);
+    await telePrint("                                         '----------------'",             0);
+    await telePrint('                                     DIE USS ENTERPRISE --- NCC-1701',      0);
     await telePrint('', 0);
 
     // Anleitung?
@@ -2352,7 +2331,12 @@ async function startGame() {
   $term.scrollTop = $term.scrollHeight;
 }
 
-window.addEventListener('load', startGame);
+// Nur Desktop: auf dem Handy würde der Eingabefokus die Bildschirmtastatur öffnen
+const _desktop = matchMedia('(min-width: 768px)');
+window.addEventListener('load', () => {
+  if (_desktop.matches) startGame();
+  else _desktop.addEventListener('change', startGame, { once: true });
+});
 </script>
 </body>
 </html>
