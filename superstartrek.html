@@ -453,6 +453,132 @@ const SFX = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// EVENT-GRAFIKEN (Sonderereignisse) – «klasse|text» färbt einen Abschnitt
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const EVENT_ART = {
+  mudd: [
+    '      _________         «c-yel|"ICH LEIHE MIR DAS NUR AUS,»',
+    '    _|_________|_       «c-yel| CAPTAIN. EHRENWORT!"»',
+    '   /             \\',
+    '  |   (o)   (o)   |                .-----------.',
+    '  |       ^       |   . . . . . .> | ENERGIE   |',
+    '  |   \\~~~~~~~/   |                |   - 10 %  |',
+    '   \\    \'---\'    /                 \'-----------\'',
+    '    \'-----------\'',
+  ],
+  vulcan: [
+    '        __ __   __ __',
+    '       |  |  | |  |  |',
+    '       |  |  | |  |  |',
+    '       |  |  | |  |  |    «e|LEBEN SIE LANG»',
+    '       |  |  \\_/  |  |    «e|UND IN FRIEDEN.»',
+    '  __   |             |',
+    ' \\  \\  |             |',
+    '  \\  \\ |             |',
+    '   \\  \\|             |',
+    '    \\                |',
+    '     \\              /',
+    '      \\            /',
+    '       \'----------\'',
+  ],
+  cyranoCrate: [
+    '+------------------------+',
+    '|  CYRANO JONES          |',
+    '|  INTERGALAKTISCHER     |',
+    '|  HANDEL UND WANDEL     |',
+    '+------------------------+',
+    '|  (=O) (=O) (=O) (=O)   |',
+    '|  (=O) (=O) (=O) (=O)   |',
+    '|  (=O) (=O)             |',
+    '+------------------------+',
+  ],
+  cyranoTribbles: [
+    '',
+    '          «st|(~~)»  «st|(~~~)»',
+    '       «st|(~~~)»  «st|(~~)»  «st|(~~)»',
+    '     «st|(~~)»  «st|(~~~~)»  «st|(~~~)»',
+    '',
+    '   "NUR EIN KLEINES GESCHENK',
+    '    FÜR DIE CREW, CAPTAIN ..."',
+    '',
+    '',
+  ],
+  tribbles: [
+    '                                         «k|             .-\'\'\'\'-.»',
+    '                                         «k|            (   ()   )»',
+    '«st|(~~)» «st|(~~~)» «st|(~~)»         «dot|.»  «e|:»  «dot|.»  «e|:»       «k|             \'-.__.-\'»',
+    '  «st|(~~~)» «st|(~~)»  «st|(~~)»      «e|:»  «dot|.»  «e|*»  «dot|.»       «k|                ||»',
+    '«st|(~~)» «st|(~~)» «st|(~~~)»    ==>  «dot|.»  «e|*»  «dot|.»  «e|:»  ==>  «k|                ||»',
+    '  «st|(~~~)» «st|(~~)»  «st|(~~)»      «e|:»  «dot|.»  «e|:»  «dot|.»       «k|   [=====]______||______[=====]»',
+    '                                         «k|          \\_____/\\_____/»',
+    '                                         «k|               /  \\»',
+    '                                         «k|               \'--\'»',
+  ],
+  ponfarr: [
+    '+--------------------------------------+',
+    '|  BIBLIOTHEKSCOMPUTER                 |',
+    '|--------------------------------------|',
+    '|  > ANFRAGE: KURS ZUR STERNENBASIS    |',
+    '|                                      |',
+    '|«e|    O T\'PRING, MEIN GEDANKE           »|',
+    '|«e|    BRENNT WIE DER SAND VON VULKAN.   »|',
+    '|«e|    DIE LOGIK SCHWEIGT. DAS BLUT      »|',
+    '|«e|    SINGT. DREIMAL SIEBEN MONDE ...   »|',
+    '|                                      |',
+    '+--------------------------------------+',
+    '          |__________________|',
+  ],
+  scottyCaptured: [
+    '«k|.=================.»',
+    '«k|||»   |   |   |   «k|||»    "CAPTAIN! DIE KLINGONEN WOLLEN',
+    '«k|||»   | o |   |   «k|||»     WISSEN, WIE MAN EINEN',
+    '«k|||»   |/|\\|   |   «k|||»     WARPKERN FRISIERT.',
+    '«k|||»   |/ \\|   |   «k|||»     ICH SAG KEIN WORT!"',
+    '«k|||»«k|___»|«k|___»|«k|___»|«k|___»«k|||»',
+    '«k|\'=================\'»',
+  ],
+  scottyFree: [
+    '     .  «e|:»  «e|*»  «e|:»  .',
+    '     «e|:»  «e|*»  o  «e|*»  «e|:»       "SCOTT AN BRÜCKE:',
+    '     «e|*»  «e|:» /|\\ «e|:»  «e|*»        BIN WIEDER AN BORD, UND DER',
+    '     «e|:»  «e|*» / \\ «e|*»  «e|:»        MASCHINENRAUM GEHÖRT',
+    '   __\'___________\'__      WIEDER MIR!"',
+    '  [_________________]',
+  ],
+  khan: [
+    '  ____  ____  ____  ____  ____  ____',
+    ' [____][____][____][____][____][____]=====<]',
+    '    S.S. BOTANY BAY  -  DY-100  -  1996',
+    '',
+    '+-------+  +-------+  +-------+  +-------+',
+    '| .---. |  | .---. |  | .---. |  | .   . |',
+    '| | z | |  | | z | |  | | z | |  |   !   |      «k|KHAN NOONIEN SINGH»',
+    '| \'---\' |  | \'---\' |  | \'---\' |  | \'   \' |      «k|IST ERWACHT.»',
+    '+-------+  +-------+  +-------+  +-------+',
+  ],
+  planet: [
+    '«st|     .-\'\'\'\'\'\'-.»',
+    '«st|   .\'  .    .  \'.»',
+    '«st|  /   .    .     \\»     KHAN UND SEINE ANHÄNGER',
+    '«st| |                |»    WERDEN HIER AUSGESETZT.',
+    '«st|  \\  .     .  .  /»',
+    '«st|   \'.   .   .  .\'»',
+    '«st|    \'-.______.-\'»       «dot|"KHAAAAAAAN!" (SPÄTER)»',
+  ],
+};
+
+async function printArt(rows) {
+  await telePrint('', 0);
+  for (const r of rows) {
+    const html = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/«([\w-]+)\|([^»]*)»/g, '<span class="$1">$2</span>');
+    await printHtml(html, 0);
+  }
+  await telePrint('', 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // GAME CLASS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1859,7 +1985,9 @@ class Game {
     if (this.k3 <= 0) { await telePrint("MR. SCOTT MELDET: 'KEINE KLINGONENSCHIFFE IN REICHWEITE ZUM TRANSPORTIEREN, CAPTAIN!'"); return false; }
 
     beep(440,80); beep(330,80); beep(220,200);
-    await telePrint('TRANSPORTERRAUM: TRIBBLES WERDEN ZU KLINGONENSCHIFF TRANSPORTIERT . . .', 800);
+    await telePrint('TRANSPORTERRAUM: TRIBBLES WERDEN ZU KLINGONENSCHIFF TRANSPORTIERT . . .');
+    await printArt(EVENT_ART.tribbles);
+    await sleep(800);
 
     let destroyed = 0;
     for (let i = 1; i <= 3; i++) {
@@ -1908,6 +2036,9 @@ class Game {
         await telePrint('UND MIT EINEM LETZTEN, VERZWEIFELTEN HIEB GEHT KHAN ZU BODEN. BEWUSSTLOS.');
         await telePrint('MCCOY: \'Er lebt noch, Jim. Aber er wird eine Weile schlafen.\'');
         await telePrint(`\nDIE ENTERPRISE FINDET EINEN BEWOHNBAREN PLANETEN: ${planet}.`);
+        const lp = Math.floor((16 - planet.length) / 2);   // Schild ist 16 Zeichen breit
+        await printArt(EVENT_ART.planet.map(r =>
+          r.replace(' '.repeat(16), ' '.repeat(lp) + planet + ' '.repeat(16 - lp - planet.length))));
         await telePrint('KIRK SETZT KHAN UND DIE GESAMTE CREW DER BOTANY BAY DORT AUS — NICHT ALS');
         await telePrint('GEFANGENE, SONDERN MIT DER CHANCE, EINE EIGENE WELT ZU FORMEN.');
         await telePrint(`KIRK: 'EIN UNBERÜHRTER PLANET, KHAN. EINE WELT, DIE SIE NACH IHREM WILLEN`);
@@ -1939,6 +2070,7 @@ class Game {
       this.khanJumpsRemaining = 2 + Math.floor(Math.random() * 7); // 2..8
       beep(200, 250); beep(160, 300); beep(130, 400);
       await telePrint('\n*** SENSORKONTAKT — EIN ANTIKES WRACK TREIBT LAUTLOS DURCH DEN QUADRANTEN ***');
+      await printArt(EVENT_ART.khan);
       await telePrint('SPOCK: \'EIN SCHLÄFERSCHIFF AUS DEM 20. JAHRHUNDERT, CAPTAIN. DIE HÜLLE TRÄGT');
       await telePrint("        DIE KENNUNG »SS BOTANY BAY«. ICH REGISTRIERE SCHWACHE LEBENSZEICHEN —");
       await telePrint("        DUTZENDE MENSCHEN IN KÄLTESCHLAF, SEIT ÜBER ZWEIHUNDERT JAHREN.'");
@@ -1964,6 +2096,7 @@ class Game {
       const stolen = Math.max(1, Math.floor(this.energyLevel * 0.10));
       beep(350,150); beep(280,200);
       await telePrint('\n*** HARRY MUDD ERSCHEINT AUF DEM BILDSCHIRM! ***');
+      await printArt(EVENT_ART.mudd);
       await telePrint('DER BERÜCHTIGTE SCHWINDLER IST UNBEMERKT AN BORD GEGANGEN UND HAT');
       await telePrint(`DIE ENERGIERESERVEN DES SCHIFFES ANGEZAPFT -- ${stolen} EINHEITEN GESTOHLEN!`);
       this.energyLevel = Math.max(0, this.energyLevel - stolen);
@@ -1976,6 +2109,7 @@ class Game {
       this.vulcanShipQuadrant = [0, 0];
       beep(880,100); beep(1100,150); beep(1320,200);
       await telePrint('\n*** EIN VULKANISCHES FORSCHUNGSSCHIFF RUFT DIE ENTERPRISE ***');
+      await printArt(EVENT_ART.vulcan);
       await telePrint("'LEBEN SIE LANG UND IN FRIEDEN, CAPTAIN. UNSERE SENSOREN ENTDECKEN");
       await telePrint(" SCHÄDEN AN IHREM FAHRZEUG. WIR BIETEN HILFE AN.'");
       for (let i = 1; i <= 8; i++) if (this.damageLevel[i] < 0) this.damageLevel[i] = 0;
@@ -1995,12 +2129,15 @@ class Game {
       this.traderQuadrant = [0, 0];
       beep(440,100); beep(550,120);
       await telePrint('\n*** CYRANO JONES RUFT DIE ENTERPRISE ***');
+      const tribbles = Math.random() < 0.50;
+      await printArt(tribbles ? EVENT_ART.cyranoCrate.map((r, i) => r + EVENT_ART.cyranoTribbles[i])
+                              : EVENT_ART.cyranoCrate);
       await telePrint("'ICH HABE WAREN ZU HANDELN, CAPTAIN — EINSCHLIESSLICH TORPEDOVORRÄTE.'");
       const added = this.maxTorpedoes - Math.floor(this.photonTorpedoes);
       this.photonTorpedoes = this.maxTorpedoes;
       if (added > 0) await telePrint(`${added} TORPEDOS NACHGEFÜLLT. RÖHREN JETZT VOLL (${this.maxTorpedoes} GESAMT).`);
       else await telePrint('TORPEDORÖHREN BEREITS VOLL.');
-      if (Math.random() < 0.50) {
+      if (tribbles) {
         this.tribblesInfested = true;
         beep(300,200);
         await telePrint('*** TRIBBLES AN BORD DER ENTERPRISE ENTDECKT! ***');
@@ -2022,6 +2159,7 @@ class Game {
       await telePrint("'ER BEFINDET SICH IM PON FARR. ICH HABE IHN IN DEN MANNSCHAFTSQUARTIEREN");
       await telePrint(" EINGESCHLOSSEN, ABER... CAPTAIN, ER HAT VORHER NOCH SCHNELL DEN");
       await telePrint(" BIBLIOTHEKSCOMPUTER AUF VULKANISCHE LYRIK UMGESTELLT.'");
+      await printArt(EVENT_ART.ponfarr);
       await telePrint('DER BIBLIOTHEKSCOMPUTER IST FÜR CA. 3 STERNDATEN NICHT VERFÜGBAR.');
       if (this.damageLevel[8] < -3.0) {
         await telePrint('(SYSTEM WAR BEREITS BESCHÄDIGT – SCHADEN NICHT VERSCHLIMMERT.)');
@@ -2047,8 +2185,7 @@ class Game {
         this.k[victim][2] = 0;
         this.k3--;
         this.totalKlingonShips--;
-        this.galaxy[this.q1][this.q2] = this.k3 * 1000 + this.r3 * 100 + this.b3 * 10 + this.s3;
-        this.exploredSpace[this.q1][this.q2] = this.galaxy[this.q1][this.q2];
+        this._updateQuadrantRecord();
         this.shipCondition = this._checkShipStatus();
         beep(400, 100); beep(300, 150); beep(200, 300);
         await telePrint('\n*** NOTFALL AUF DEM TRANSPORTER! ***');
@@ -2057,6 +2194,7 @@ class Game {
         await telePrint('DER KLINGONISCHE KAMPFKREUZER HAT DEN QUADRANTEN VERLASSEN.');
         await telePrint("UHURA: 'CAPTAIN, WIR HABEN KEINE TRANSPORTER-KONTROLLE MEHR.");
         await telePrint("        MR. SCOTT IST AUF DEM KLINGONISCHEN SCHIFF GEFANGEN.'");
+        await printArt(EVENT_ART.scottyCaptured);
         await telePrint('\nAUSWIRKUNGEN SOLANGE SCOTTY FEHLT:');
         await telePrint('  – REPARATUREN AN DER BASIS DAUERN 30% LÄNGER');
         await telePrint('  – NOTFALLREPARATUREN KOSTEN DOPPELTE ENERGIE');
@@ -2079,6 +2217,7 @@ class Game {
     this.scottyCapturedInQuadrant = [0, 0];
     beep(880, 100); beep(1100, 100); beep(1320, 200);
     await telePrint('\n*** TRANSPORTER-SIGNAL EMPFANGEN! ***');
+    await printArt(EVENT_ART.scottyFree);
     await telePrint("SCOTTY: 'GOTT SEI DANK, CAPTAIN! DIE KLINGONEN WAREN SO ABGELENKT,");
     await telePrint("         DASS ICH MICH SELBST ZURÜCKBEAMEN KONNTE. ICH BIN WIEDER AN BORD!'");
     await telePrint("McCOY:  'Willkommen zurück, du verrückter Schotte.'");

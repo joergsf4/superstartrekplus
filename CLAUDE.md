@@ -48,6 +48,7 @@ Keine. Reines Vanilla-JS, läuft in jedem modernen Browser.
   `shortRangeSensorScan()` rendert die Brücke neu: Sektorkarte, Statuswerte, `_enterpriseSchematic()`
   (Schilde + Geräteschäden) und Crew-Leiste. Reine Tastatureingabe.
 - Sound: `beep()` (Rechteckton) und `SFX.phaser()/torpedo()/boom()/warp()` (Web Audio, ohne Samples).
+- Sonderereignisse zeigen ASCII-Grafiken aus `EVENT_ART` über `printArt()`; `«klasse|text»` in einer Zeile färbt einen Abschnitt (CSS-Klasse).
 - Farben: `safeHtml()` (Token → PUA-Escaping → `<span>`) + `colorMsg()` (Nachrichtenklassen) im Terminal-Log.
 
 ## Wichtige Methoden (Auswahl)
