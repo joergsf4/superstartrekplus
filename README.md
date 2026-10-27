@@ -20,7 +20,12 @@ Als Kommandant der Enterprise übernimmst du das Kommando über die Galaxis und 
 
 ### Features
 - Klassisches Super-Star-Trek-Gameplay, modernisiert für den Browser
-- Retro-Terminal-Optik im Browser
+- Klassische ASCII-Brücke im grünen Terminal-Look: Sektorkarte, Status mit Restzeit, Enterprise-Schema mit Schilden und Systemschäden, feste Kompassrose
+- Sonderereignisse (Harry Mudd, Vulkanier, Cyrano Jones und die Tribbles, Pon Farr, Scottys Entführung, Khan) mit eigenen ASCII-Grafiken
+- Synthetische Soundeffekte über Web Audio
+- Für Desktop-Computer mit Tastatur gedacht; ↑/↓ blättert durch frühere Eingaben. Auf Handy-Bildschirmen erscheint nur ein Hinweis.
+
+Die frühere grafische LCARS-Oberfläche ist im Branch [`lcars-legacy`](https://github.com/joergsf4/superstartrekplus/tree/lcars-legacy) erhalten.
 
 ## Projektstruktur
 
@@ -28,6 +33,7 @@ Als Kommandant der Enterprise übernimmst du das Kommando über die Galaxis und 
 |-------|--------------|
 | `superstartrek.html` | Das gesamte Spiel (HTML + CSS + JS, Single File) |
 | `HANDBUCH.html` | Vollständige Spielanleitung auf Deutsch |
+| `EVENTS.md` | Konzept der Sonderereignisse |
 | `legacy/superstartrek.py` | Python-Vorgängerversion (Referenz) |
 | `legacy/_test_events.py` | Python-Ereignistests (Referenz) |
 
